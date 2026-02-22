@@ -138,12 +138,53 @@ Notas:
 
 ---
 
-### 5.4 IngredientsPurchaseFailed
+### 5.4 IngredientPurchaseRequired
 
 **Publicado por:** `inventory-service`  
 **Escuchado por:**
-- `order-service`
 - `kitchen-service`
+- `purchase-service`
+
+```json
+{
+  "orderId": "uuid",
+  "ingredient_required": {
+    "id": "uuid",
+    "quantity": 2
+  }
+}
+```
+
+Notas:
+
+- Indica que se requiere comprar ingredientes.
+- No incluye información interna de stock.
+
+---
+
+### 5.5 IngredientPurchaseCompleted
+
+**Publicado por:** `purchase-service`  
+**Escuchado por:** `inventory-service`
+
+```json
+{
+  "orderId": "uuid",
+  "ingredient_purchased": {
+    "id": "uuid",
+    "quantity": 2
+  }
+}
+```
+
+---
+
+### 5.6 IngredientPurchaseFailed
+
+**Publicado por:** `purchase-service`  
+**Escuchado por:**
+- `order-service`
+- `inventory-service`
 
 ```json
 {
@@ -154,7 +195,7 @@ Notas:
 
 ---
 
-### 5.5 OrderItemsSelected
+### 5.7 OrderItemsSelected
 
 **Publicado por:** `kitchen-service`  
 **Escuchado por:** `order-service`
@@ -182,7 +223,7 @@ Notas:
 
 ---
 
-### 5.6 OrderCompleted
+### 5.8 OrderCompleted
 
 **Publicado por:** `kitchen-service`  
 **Escuchado por:** `order-service`

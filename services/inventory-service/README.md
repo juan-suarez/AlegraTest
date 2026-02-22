@@ -1,291 +1,211 @@
-# Inventory Service
+# inventory-service
 
-Este servicio es crítico para garantizar consistencia bajo alta concurrencia.
+Servicio responsable de la gestión de inventario, reservas fuertes y coordinación de compras cuando no hay stock suficiente.
+
+Es la única fuente de verdad del stock.
 
 ---
 
 # 1. Responsabilidades
 
-✔ Mantener stock consistente  
-✔ Evitar race conditions  
-✔ Garantizar que una orden no use recursos de otra  
-✔ Crear reservas fuertes  
-✔ Liberar reservas si la compra falla  
-✔ Publicar `IngredientsReserved` o `IngredientsPurchaseFailed`  
-
-No:
-
-✘ Cocina  
-✘ Cambia estados de órdenes directamente  
-✘ Selecciona recetas  
+- Mantener stock consistente de ingredientes.
+- Crear reservas fuertes por orden.
+- Detectar faltantes.
+- Solicitar compras.
+- Aplicar resultados de compra.
+- Liberar reservas cuando una orden es cancelada.
+- Garantizar consistencia bajo concurrencia.
 
 ---
 
 # 2. Modelo de Datos
 
----
-
 ## 2.1 Tabla: ingredients
 
-```sql
-CREATE TABLE ingredients (
-    id UUID PRIMARY KEY,
-    name VARCHAR(50) UNIQUE NOT NULL,
-    stock INTEGER NOT NULL,
-    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-);
-```
-
-### Inicialización
-
-Cada ingrediente inicia con:
-
-```
-stock = 5
-```
+| Campo      | Tipo     | Descripción |
+|------------|----------|-------------|
+| id         | UUID     | Identificador del ingrediente |
+| name       | string   | Nombre |
+| stock      | integer  | Unidades disponibles |
+| created_at | datetime | Fecha creación |
+| updated_at | datetime | Última actualización |
 
 ---
 
 ## 2.2 Tabla: reservations
 
-```sql
-CREATE TABLE reservations (
-    id UUID PRIMARY KEY,
-    order_id UUID NOT NULL,
-    ingredient_id UUID NOT NULL REFERENCES ingredients(id),
-    quantity INTEGER NOT NULL,
-    status VARCHAR(30) NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT NOW()
-);
-```
-
-### Estados de Reserva
-
-| Estado | Significado |
-|--------|------------|
-| `RESERVED` | Stock descontado y asegurado |
-| `PURCHASE_PENDING` | En espera de compra externa |
-| `PURCHASED_RESERVED` | Compra exitosa y ya reservado |
-| `RELEASED` | Liberado por fallo |
-| `COMMITTED` | Consumido definitivamente |
+| Campo             | Tipo     | Descripción |
+|------------------|----------|-------------|
+| id               | UUID     | Identificador |
+| order_id         | UUID     | Orden asociada |
+| ingredient_id    | UUID     | Ingrediente |
+| quantity_needed  | integer  | Total requerido |
+| quantity_reserved| integer  | Garantizado |
+| status           | enum     | Estado |
+| created_at       | datetime | Fecha creación |
+| updated_at       | datetime | Última actualización |
 
 ---
 
-# 3. Reserva Fuerte 
+## 2.3 Estados
 
-Reserva fuerte significa:
-
-- El stock se descuenta inmediatamente.
-- Ninguna otra orden puede usar esas unidades.
-- Todo ocurre dentro de una transacción.
-- Se evita race condition en recursos compartidos.
+- `RESERVED`
+- `PURCHASE_PENDING`
+- `RELEASED`
 
 ---
 
-# 4. Control de Concurrencia
+# 3. Garantía de Recursos (Reservas Fuertes)
 
-Se usa:
+La consistencia se garantiza usando reservas y bloqueo por fila.
+
+## 3.1 Paso 1 — Bloqueo del ingrediente
 
 ```sql
 SELECT stock
 FROM ingredients
-WHERE id = $1
+WHERE id = :ingredient_id
 FOR UPDATE;
 ```
 
 Esto:
 
-- Bloquea temporalmente la fila del ingrediente.
-- Evita que múltiples órdenes lean el mismo stock simultáneamente.
-- Garantiza consistencia en alta concurrencia.
-
-El bloqueo dura únicamente durante la transacción, mientras se decide si se tiene que enviar a comprar o no, pero no necesariamente espera a que la compra se efectua. si requiere comprar ingredientes genera la reserva, se desbloquea la fila en la db, se publica el evento para generar la compra y la instancia se libera.
+- Bloquea la fila del ingrediente.
+- Evita race conditions.
+- Garantiza que dos órdenes no descuenten el mismo stock.
 
 ---
 
-# 5. Casos de Procesamiento
+## 3.2 Paso 2 — Validación y descuento seguro
 
-El servicio recibe:
-
-```
-IngredientsRequired
-```
-
-con múltiples ingredientes.
-
-Cada ingrediente se procesa dentro de una transacción independiente para evitar bloqueos prolongados.
-
----
-
-# 5.1 Caso 1 — Stock Suficiente
-
-Ejemplo:
-
-Se requieren 3 tomates.  
-Stock actual: 5.
-
-Flujo:
-
-1. Se ejecuta `SELECT ... FOR UPDATE`
-2. Se verifica que `stock >= required`
-3. Se actualiza:
+Se calcula el maximo entre la cantidad requerida y el stock
 
 ```sql
 UPDATE ingredients
-SET stock = stock - 3
-WHERE id = $1;
+SET stock = max_required
+WHERE id = :ingredient_id
 ```
 
-4. Se crea reserva:
+y se crea la reserva del ingrediente, en caso de que no hagan falta unidades se crea en estado `RESERVED`. En el caso de que hagan falta unidades se crea en estado `PURCHASE_PENDING` y se publica el evento para generar la compra
 
-```sql
-INSERT INTO reservations (...)
-VALUES (..., status = 'RESERVED');
-```
+Este patrón:
 
-5. Se confirma la transacción.
-
-Resultado:
-
-- Stock nuevo: 2
-- Unidades aseguradas exclusivamente para esa orden
+- Evita que el stock quede negativo.
+- Protege contra condiciones de carrera.
+- lleva una trazabilidad de los ingredientes que ya estan reservados para la orden. esto en caso de que no se pueda comprar alguno y asi liberarlos todos.
 
 ---
 
-# 5.2 Caso 2 — Stock Parcial (requiere compra)
+## 3.3 Resultado
 
-Ejemplo:
+- Si se descuenta completamente → `RESERVED`
+- Si no hay stock → `PURCHASE_PENDING`
 
-Se requieren 5 tomates.  
-Stock actual: 3.
-
-Flujo:
-
-1. `SELECT ... FOR UPDATE`
-2. Se detecta que falta inventario.
-3. Se descuentan inmediatamente los 3 disponibles:
-
-```sql
-UPDATE ingredients
-SET stock = 0
-WHERE id = $1;
-```
-
-4. Se crea reserva por las 3 unidades existentes:
-
-```sql
-status = 'RESERVED'
-quantity = 3
-```
-
-5. Se calcula faltante: 2 unidades.
-6. Se crea registro adicional en `reservations`:
-
-```sql
-status = 'PURCHASE_PENDING'
-quantity = 2
-```
-
-7. Se confirma transacción.
-8. Se solicita compra externa por 2 unidades.
+La reserva representa garantía real porque el stock ya fue descontado.
 
 ---
 
-## Si la compra es exitosa
+# 4. Flujo de Compra por Ingrediente
 
-1. Se actualiza reserva:
+inventory publica:
 
 ```
-status = 'PURCHASED_RESERVED'
+PurchaseRequested
 ```
 
-2. Se publica `IngredientsReserved` (cuando todos los ingredientes estén asegurados).
+Evento por ingrediente:
+
+```json
+{
+  "orderId": "123",
+  "ingredientId": "tomato",
+  "quantityRequired": 4
+}
+```
+
+Esto debido a que no se pueden comprar varios ingredientes al mismo tiempo ni tampoco especificar la cantidad de ingredientes solicitada lo que implica un proceso de reintento de compras por parte de `purcharse-service` hasta garantizar la cantidad necesaria para completar la orden.
 
 ---
 
-## Si la compra falla
+# 5. Recepción de PurchaseCompleted
 
-1. Se liberan reservas:
+Evento:
+
+```json
+{
+  "orderId": "123",
+  "ingredientId": "tomato",
+  "quantityPurchased": 6
+}
+```
+
+Proceso:
+
+1. Verificar si la orden ya fue liberada.
+2. Si está liberada:
+   - Sumar `quantityPurchased` al stock.
+   - Marcar la reserva como liberada.
+   - Fin del proceso.
+
+3. Si la orden sigue activa:
+   - Obtener reserva.
+   - calcular la cantidad que sobra:
+     ```
+     remaining = quantity_purchased - quantity_needed
+     ```
+   - cambiar el estado de la reserva a `RESERVED`
+   - actualizar stock si quedo remaining
+
+4. Completar orden:
+   - si todas las reservas de la orden estan en estado `RESERVED` se da por completada la orden.
+   - se publica el evento `IngredientsReserved`
+
+---
+
+# 6. Recepción de PurchaseFailed
+
+Evento:
+
+```json
+{
+  "orderId": "123",
+  "ingredientId": "tomato",
+  "quantityPurchased": 2
+}
+```
+
+Importante:
+
+En este modelo, `PurchaseFailed` puede traer cantidad parcial comprada.
+
+purchasing-service:
+
+- Intenta comprar múltiples veces.
+- Si no logra cubrir lo requerido, emite `PurchaseFailed`.
+- Puede traer cantidad > 0.
+
+---
+
+## 6.1 Proceso en inventory
+
+Liberar cualquier cantidad previamente reservada con:
 
 ```sql
-UPDATE reservations
-SET status = 'RELEASED'
-WHERE order_id = $1;
+    WITH updated_reservations AS (
+        UPDATE ingredient_reservations
+        SET status = 'RELEASED'
+        WHERE order_id = :order_id
+        AND status <> 'RELEASED'
+        RETURNING ingredient_id, quantity_reserved
+    )
+    UPDATE ingredients i
+    SET stock = i.stock + ur.quantity_reserved
+    FROM updated_reservations ur
+    WHERE i.id = ur.ingredient_id;
 ```
 
-2. Se restauran cantidades al stock:
+esto libera toda la orden y marca todas las reservas como `RELEASED`.
 
-```sql
-UPDATE ingredients
-SET stock = stock + released_quantity;
-```
-
-3. Se publica:
-
-```
-IngredientsPurchaseFailed
-```
-
----
-
-# 5.3 Caso 3 — Stock Cero
-
-Ejemplo:
-
-Se requieren 4 tomates.  
-Stock actual: 0.
-
-Flujo:
-
-1. No se descuenta nada.
-2. Se crea reserva:
-
-```
-status = 'PURCHASE_PENDING'
-quantity = 4
-```
-
-3. Se solicita compra externa por 4 unidades.
-
-Si compra exitosa:
-
-- Reserva → `PURCHASED_RESERVED`
-
-Si falla:
-
-- Reserva → `RELEASED`
-
----
-
-# 6. Publicación de Eventos
-
-Cuando todos los ingredientes de la orden estén asegurados:
-
-```
-IngredientsReserved
-```
-
-Si alguno falla:
-
-```
-IngredientsPurchaseFailed
-```
-
----
-
-# 7. Garantía de Aislamiento entre Órdenes
-
-Gracias a:
-
-- `SELECT FOR UPDATE`
-- Descuento inmediato de stock
-- Creación de reservas fuertes
-- Procesamiento transaccional por ingrediente
-
-Se garantiza que:
-
-- Ninguna orden usa ingredientes ya reservados
-- No hay doble consumo
-- No hay race condition en recursos compartidos
+ya por ultimo se manda a stock la cantidad que se haya logrado comprar en el purchaseFailed.
 
 ---
