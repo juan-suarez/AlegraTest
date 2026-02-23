@@ -1,0 +1,31 @@
+import { Pool, PoolClient } from 'pg';
+import * as dotenv from 'dotenv';
+
+dotenv.config();
+
+const pool = new Pool({
+  user: process.env.DB_USER || 'postgres',
+  password: process.env.DB_PASSWORD || 'postgres',
+  host: process.env.DB_HOST || 'localhost',
+  port: parseInt(process.env.DB_PORT || '5432'),
+  database: process.env.DB_NAME || 'order_service',
+});
+
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle client', err);
+  process.exit(-1);
+});
+
+export const getConnection = async (): Promise<PoolClient> => {
+  return pool.connect();
+};
+
+export const query = async (text: string, params?: any[]) => {
+  return pool.query(text, params);
+};
+
+export const closePool = async () => {
+  await pool.end();
+};
+
+export default pool;
