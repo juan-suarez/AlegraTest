@@ -11,6 +11,7 @@ describe('Order Service - OrderCreated Event', () => {
   let container: StartedPostgreSqlContainer;
   let dbHelper: TestDatabaseHelper;
   let orderService: OrderService;
+  let mockPublisher: { published: Array<any>; publish: (type: string, event: any) => Promise<void> };
 
   beforeAll(async () => {
     const { pool: testPool, container: testContainer } = await startTestDatabase();
@@ -20,7 +21,13 @@ describe('Order Service - OrderCreated Event', () => {
     dbHelper = new TestDatabaseHelper(pool);
     const orderRepo = new OrderRepository(pool);
     const eventRepo = new EventRepository(pool);
-    orderService = new OrderService(orderRepo, eventRepo, null!);
+    mockPublisher = {
+      published: [],
+      async publish(type: string, event: any) {
+        this.published.push({ type, event });
+      }
+    };
+    orderService = new OrderService(orderRepo, eventRepo, mockPublisher as any);
   });
 
   afterAll(async () => {
@@ -28,6 +35,7 @@ describe('Order Service - OrderCreated Event', () => {
   });
 
   beforeEach(async () => {
+    mockPublisher.published = []; 
     await cleanDatabase(pool);
   });
 
@@ -39,10 +47,28 @@ describe('Order Service - OrderCreated Event', () => {
     expect(order).not.toBeNull();
     expect(order.id).toBe(orderId);
     expect(order.status).toBe('SELECTING_RECIPES');
+
+    expect(mockPublisher.published.length).toBe(1);
+    const published = mockPublisher.published[0];
+    expect(published.type).toBe('OrderCreated');
+    expect(published.event).toMatchObject(
+    { 
+      orderId,
+      totalDishes: 3 
+    });
   });
 
-  test('should transition order to SELECTING_RECIPES after creation', async () => {
-    // TODO: Verify state transition after OrderCreated
-    expect(true).toBe(false);
+  test('should be idempotent for duplicate OrderCreated calls', async () => {
+    const orderId = randomUUID();
+    await orderService.createOrder(orderId, 3);
+    expect(mockPublisher.published.length).toBe(1);
+
+    await orderService.createOrder(orderId, 3);
+    expect(mockPublisher.published.length).toBe(1);
+
+    const order = await dbHelper.getOrder(orderId);
+    expect(order.id).toBe(orderId);
+    expect(order.status).toBe('SELECTING_RECIPES');
   });
+
 });

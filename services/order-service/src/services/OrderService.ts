@@ -1,36 +1,11 @@
 import { OrderRepository, EventRepository } from '../repositories';
-
-export interface OrderCreatedEvent {
-  orderId: string;
-  totalDishes: number;
-  timestamp: Date;
-}
-
-export interface OrderItemsSelectedEvent {
-  eventId: string;
-  orderId: string;
-  items: Array<{
-    id: string;
-    recipeId: string;
-    quantity: number;
-  }>;
-}
-
-export interface IngredientsPurchaseFailedEvent {
-  eventId: string;
-  orderId: string;
-  reason: string;
-}
-
-export interface IngredientsReservedEvent {
-  eventId: string;
-  orderId: string;
-}
-
-export interface OrderCompletedEvent {
-  eventId: string;
-  orderId: string;
-}
+import {
+  OrderCreatedEvent,
+  OrderItemsSelectedEvent,
+  IngredientsPurchaseFailedEvent,
+  IngredientsReservedEvent,
+  OrderCompletedEvent,
+} from './types';
 
 export class OrderService {
   constructor(
@@ -40,17 +15,25 @@ export class OrderService {
   ) {}
 
   async createOrder(orderId: string, totalDishes: number): Promise<OrderCreatedEvent> {
-    const order = await this.orderRepo.create(orderId, totalDishes);
+    const existingOrder = await this.orderRepo.findById(orderId);
+    if (existingOrder) {
+      return {
+        orderId,
+        totalDishes,
+        timestamp: new Date()
+      };
+    }
 
-    await this.orderRepo.updateStatus(orderId, 'SELECTING_RECIPES');
+    await this.orderRepo.create(orderId, totalDishes);
 
     const event: OrderCreatedEvent = {
       orderId,
       totalDishes,
       timestamp: new Date()
     };
-
+    
     await this.eventPublisher.publish('OrderCreated', event);
+    await this.orderRepo.updateStatus(orderId, 'SELECTING_RECIPES');
 
     return event;
   }

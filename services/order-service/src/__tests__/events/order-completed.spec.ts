@@ -2,9 +2,10 @@ import { Pool } from 'pg';
 import { type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { startTestDatabase, stopTestDatabase, cleanDatabase } from '../helpers/database';
 import { randomUUID } from 'node:crypto';
-import { OrderCompletedEvent, OrderService } from '../../services/OrderService';
+import { OrderService } from '../../services/OrderService';
 import { TestDatabaseHelper } from '../helpers/test-helpers';
 import { EventRepository, OrderRepository } from '../../repositories';
+import { OrderCompletedEvent } from '../../services/types';
 
 describe('Order Service - OrderCompleted Event', () => {
   let pool: Pool;

@@ -1,4 +1,5 @@
-import { OrderService, IngredientsPurchaseFailedEvent } from '../../services/OrderService';
+import { OrderService } from '../../services/OrderService';
+import { IngredientsPurchaseFailedEvent } from '../../services/types';
 
 export class IngredientsPurchaseFailedHandler {
   constructor(private orderService: OrderService) {}

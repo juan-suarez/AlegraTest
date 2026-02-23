@@ -1,4 +1,5 @@
-import { OrderService, OrderItemsSelectedEvent } from '../../services/OrderService';
+import { OrderService } from '../../services/OrderService';
+import { OrderItemsSelectedEvent } from '../../services/types';
 
 export class OrderItemsSelectedHandler {
   constructor(private orderService: OrderService) {}

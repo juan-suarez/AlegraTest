@@ -3,8 +3,9 @@ import { type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { startTestDatabase, stopTestDatabase, cleanDatabase } from '../helpers/database';
 import { randomUUID } from 'node:crypto';
 import { TestDatabaseHelper } from '../helpers/test-helpers';
-import { OrderService, IngredientsReservedEvent } from '../../services/OrderService';
+import { OrderService } from '../../services/OrderService';
 import { EventRepository, OrderRepository } from '../../repositories';
+import { IngredientsReservedEvent } from '../../services/types';
 
 describe('Order Service - IngredientsReserved Event', () => {
   let pool: Pool;

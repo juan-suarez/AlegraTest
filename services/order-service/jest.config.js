@@ -9,5 +9,8 @@ module.exports = {
     '!src/**/*.d.ts',
     '!src/index.ts',
   ],
-  testTimeout: 30000, // Testcontainers puede necesitar más tiempo
+  testTimeout: 30000,
+  globalSetup: '<rootDir>/src/__tests__/globalSetup.ts',
+  globalTeardown: '<rootDir>/src/__tests__/globalTeardown.ts',
+  maxWorkers: 1, // Run tests serially to share single DB container
 };

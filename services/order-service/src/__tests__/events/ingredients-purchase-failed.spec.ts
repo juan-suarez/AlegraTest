@@ -2,9 +2,10 @@ import { Pool } from 'pg';
 import { type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { startTestDatabase, stopTestDatabase, cleanDatabase } from '../helpers/database';
 import { TestDatabaseHelper } from '../helpers/test-helpers';
-import { OrderService, IngredientsPurchaseFailedEvent } from '../../services/OrderService';
+import { OrderService } from '../../services/OrderService';
 import { OrderRepository, EventRepository } from '../../repositories';
 import { randomUUID } from 'node:crypto';
+import { IngredientsPurchaseFailedEvent } from '../../services/types';
 
 describe('Order Service - IngredientsPurchaseFailed Event', () => {
   let pool: Pool;
