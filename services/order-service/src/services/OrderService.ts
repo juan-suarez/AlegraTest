@@ -10,6 +10,7 @@ export interface OrderItemsSelectedEvent {
   eventId: string;
   orderId: string;
   items: Array<{
+    id: string;
     recipeId: string;
     quantity: number;
   }>;
@@ -47,11 +48,12 @@ export class OrderService {
 
   async handleOrderItemsSelected(event: OrderItemsSelectedEvent): Promise<void> {
     if (await this.eventRepo.isEventProcessed(event.eventId)) {
-      return; 
+      return;
     }
 
-    const orderItems = event.items.map((item, index) => ({
-      id: `${event.eventId}-item-${index}`, 
+    // Kitchen-service envía los IDs, solo mapamos a la estructura del repositorio
+    const orderItems = event.items.map((item) => ({
+      id: item.id,
       order_id: event.orderId,
       recipe_id: item.recipeId,
       quantity: item.quantity

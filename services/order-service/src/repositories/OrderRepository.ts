@@ -46,13 +46,24 @@ export class OrderRepository {
   }
 
   async createOrderItems(items: Omit<OrderItem, 'created_at'>[]): Promise<OrderItem[]> {
-    const values = items.map((_, i) => `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`).join(', ');
-    const params = items.flatMap(item => [item.id, item.order_id, item.recipe_id, item.quantity]);
+    const placeholders = items
+      .map((_, i) => `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4})`)
+      .join(', ');
+    
+    const params = items.flatMap(item => [
+      item.id,
+      item.order_id,
+      item.recipe_id,
+      item.quantity
+    ]);
 
-    const result = await this.pool.query(
-      `INSERT INTO order_items (id, order_id, recipe_id, quantity) VALUES ${values} RETURNING *`,
-      params
-    );
+    const query = `
+      INSERT INTO order_items (id, order_id, recipe_id, quantity)
+      VALUES ${placeholders}
+      RETURNING *
+    `;
+
+    const result = await this.pool.query(query, params);
     return result.rows;
   }
 

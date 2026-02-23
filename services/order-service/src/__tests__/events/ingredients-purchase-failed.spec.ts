@@ -18,10 +18,9 @@ describe('Order Service - IngredientsPurchaseFailed Event', () => {
     container = testContainer;
     dbHelper = new TestDatabaseHelper(pool);
 
-    // Instanciar dependencias
     const orderRepo = new OrderRepository(pool);
     const eventRepo = new EventRepository(pool);
-    orderService = new OrderService(orderRepo, eventRepo, null!); // null! for EventPublisher (not needed for this test)
+    orderService = new OrderService(orderRepo, eventRepo, null!); 
   });
 
   afterAll(async () => {

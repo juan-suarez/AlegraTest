@@ -2,17 +2,25 @@ import { Pool } from 'pg';
 import { type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { startTestDatabase, stopTestDatabase, cleanDatabase } from '../helpers/database';
 import { TestDatabaseHelper } from '../helpers/test-helpers';
+import { OrderService, OrderItemsSelectedEvent } from '../../services/OrderService';
+import { OrderRepository, EventRepository } from '../../repositories';
+import { randomUUID } from 'node:crypto';
 
 describe('Order Service - OrderItemsSelected Event', () => {
   let pool: Pool;
   let container: StartedPostgreSqlContainer;
   let dbHelper: TestDatabaseHelper;
+  let orderService: OrderService;
 
   beforeAll(async () => {
     const { pool: testPool, container: testContainer } = await startTestDatabase();
     pool = testPool;
     container = testContainer;
     dbHelper = new TestDatabaseHelper(pool);
+
+    const orderRepo = new OrderRepository(pool);
+    const eventRepo = new EventRepository(pool);
+    orderService = new OrderService(orderRepo, eventRepo, null!);
   });
 
   afterAll(async () => {
@@ -24,42 +32,81 @@ describe('Order Service - OrderItemsSelected Event', () => {
   });
 
   test('should save order items when OrderItemsSelected is received', async () => {
-    // Given: an order exists in SELECTING_RECIPES state
-    const orderId = '550e8400-e29b-41d4-a716-446655440000';
+    const orderId = randomUUID();
     await dbHelper.createOrder(orderId, 2, 'SELECTING_RECIPES');
 
-    // When: OrderItemsSelected event is received
-    const eventId = 'event-123';
-    const event = {
+    const eventId = randomUUID();
+    const event: OrderItemsSelectedEvent = {
       eventId,
       orderId,
       items: [
-        { recipeId: 'recipe-001', quantity: 1 },
-        { recipeId: 'recipe-002', quantity: 1 }
+        { id: randomUUID(), recipeId: randomUUID(), quantity: 1 },
+        { id: randomUUID(), recipeId: randomUUID(), quantity: 1 }
       ]
     };
 
-    // TODO: Call OrderService.handleOrderItemsSelected(event)
+    await orderService.handleOrderItemsSelected(event);
 
-    // Then: order items should be created
     const orderItems = await dbHelper.getOrderItems(orderId);
     expect(orderItems).toHaveLength(2);
+    expect(orderItems[0].id).toBe(event.items[0]!.id);
+    expect(orderItems[1].id).toBe(event.items[1]!.id);
 
-    // And: order status should change to WAITING_INGREDIENTS
     const order = await dbHelper.getOrder(orderId);
     expect(order.status).toBe('WAITING_INGREDIENTS');
 
-    // And: event should be marked as processed
     expect(await dbHelper.isEventProcessed(eventId)).toBe(true);
   });
 
   test('should handle multiple recipes in OrderItemsSelected', async () => {
-    // TODO: Test with multiple recipe items
-    expect(true).toBe(false);
+    const orderId = randomUUID();
+    await dbHelper.createOrder(orderId, 3, 'SELECTING_RECIPES');
+
+    const eventId = randomUUID();
+    const event: OrderItemsSelectedEvent = {
+      eventId,
+      orderId,
+      items: [
+        { id: randomUUID(), recipeId: randomUUID(), quantity: 1 },
+        { id: randomUUID(), recipeId: randomUUID(), quantity: 2 },
+        { id: randomUUID(), recipeId: randomUUID(), quantity: 1 }
+      ]
+    };
+
+    await orderService.handleOrderItemsSelected(event);
+
+    const orderItems = await dbHelper.getOrderItems(orderId);
+    expect(orderItems).toHaveLength(3);
+    expect(orderItems.map(item => item.quantity)).toEqual([1, 2, 1]);
   });
 
   test('should be idempotent for duplicate OrderItemsSelected events', async () => {
-    // TODO: Test idempotency using events_processed table
-    expect(true).toBe(false);
+    const orderId = randomUUID();
+    await dbHelper.createOrder(orderId, 2, 'SELECTING_RECIPES');
+
+    const eventId = randomUUID();
+    const event: OrderItemsSelectedEvent = {
+      eventId,
+      orderId,
+      items: [
+        { id: randomUUID(), recipeId: randomUUID(), quantity: 1 },
+        { id: randomUUID(), recipeId: randomUUID(), quantity: 1 }
+      ]
+    };
+
+    await orderService.handleOrderItemsSelected(event);
+    const itemsAfterFirstHandle = await dbHelper.getOrderItems(orderId);
+
+    await orderService.handleOrderItemsSelected(event);
+    const itemsAfterSecondHandle = await dbHelper.getOrderItems(orderId);
+
+    expect(itemsAfterFirstHandle).toHaveLength(2);
+    expect(itemsAfterSecondHandle).toHaveLength(2);
+
+    const processedCount = await pool.query(
+      'SELECT COUNT(*) FROM events_processed WHERE event_id = $1',
+      [eventId]
+    );
+    expect(processedCount.rows[0].count).toBe('1');
   });
 });
