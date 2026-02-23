@@ -40,4 +40,35 @@ describe('Purchasing Service - Database Tests', () => {
     
     expect(isProcessed).toBe(true);
   });
+
+  test('should return true for already processed events', async () => {
+    const eventId = randomUUID();
+    
+    await dbHelper.markEventAsProcessed(eventId);
+    
+    // Check multiple times
+    expect(await dbHelper.isEventProcessed(eventId)).toBe(true);
+    expect(await dbHelper.isEventProcessed(eventId)).toBe(true);
+  });
+
+  test('should return false for non-processed events', async () => {
+    const eventId = randomUUID();
+    
+    expect(await dbHelper.isEventProcessed(eventId)).toBe(false);
+  });
+
+  test('should handle ON CONFLICT gracefully when marking same event twice', async () => {
+    const eventId = randomUUID();
+    
+    // Mark event twice should not throw
+    await dbHelper.markEventAsProcessed(eventId);
+    await dbHelper.markEventAsProcessed(eventId);
+    
+    // Should still be marked as processed
+    expect(await dbHelper.isEventProcessed(eventId)).toBe(true);
+    
+    // Should only have one entry
+    const count = await dbHelper.getProcessedEventCount(eventId);
+    expect(count).toBe(1);
+  });
 });
