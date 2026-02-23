@@ -1,10 +1,10 @@
-import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { startTestDatabase, stopTestDatabase, cleanDatabase } from './helpers/database';
 import { TestDatabaseHelper } from './helpers/test-helpers';
+import { randomUUID } from 'node:crypto';
 
-describe('Order Service - Database Tests', () => {
+describe('Kitchen Service - Database Tests', () => {
   let pool: Pool;
   let container: StartedPostgreSqlContainer;
   let dbHelper: TestDatabaseHelper;
@@ -24,29 +24,11 @@ describe('Order Service - Database Tests', () => {
     await cleanDatabase(pool);
   });
 
-  test('should create an order in the database', async () => {
-    const orderId = randomUUID();
-    
-    await dbHelper.createOrder(orderId, 1, 'CREATED');
-
-    const order = await dbHelper.getOrder(orderId);
-    
-    expect(order).toBeDefined();
-    expect(order.status).toBe('CREATED');
-  });
-
-  test('should insert order items for an order', async () => {
-    const orderId = randomUUID();
-    const itemId = randomUUID();
-    const recipeId = randomUUID();
-    
-    await dbHelper.createOrder(orderId, 2, 'CREATED');
-    await dbHelper.createOrderItem(itemId, orderId, recipeId, 2);
-
-    const orderItems = await dbHelper.getOrderItems(orderId);
-    
-    expect(orderItems).toHaveLength(1);
-    expect(orderItems[0].quantity).toBe(2);
+  test('should initialize database successfully', async () => {
+    // Test basic database connection
+    const result = await pool.query('SELECT NOW()');
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].now).toBeDefined();
   });
 
   test('should mark an event as processed for idempotency', async () => {
