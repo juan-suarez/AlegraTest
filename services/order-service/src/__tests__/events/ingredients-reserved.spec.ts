@@ -1,19 +1,30 @@
 import { Pool } from 'pg';
 import { type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { startTestDatabase, stopTestDatabase, cleanDatabase } from '../helpers/database';
+import { randomUUID } from 'node:crypto';
+import { TestDatabaseHelper } from '../helpers/test-helpers';
+import { OrderService, IngredientsReservedEvent } from '../../services/OrderService';
+import { EventRepository, OrderRepository } from '../../repositories';
 
 describe('Order Service - IngredientsReserved Event', () => {
   let pool: Pool;
   let container: StartedPostgreSqlContainer;
+  let dbHelper: TestDatabaseHelper;
+  let orderService: OrderService;
 
   beforeAll(async () => {
     const { pool: testPool, container: testContainer } = await startTestDatabase();
     pool = testPool;
     container = testContainer;
+
+    dbHelper = new TestDatabaseHelper(pool);
+    const orderRepo = new OrderRepository(pool);
+    const eventRepo = new EventRepository(pool);
+    orderService = new OrderService(orderRepo, eventRepo, null!);
   });
 
   afterAll(async () => {
-    await stopTestDatabase(pool, container);
+    await stopTestDatabase(pool,container);
   });
 
   beforeEach(async () => {
@@ -21,20 +32,44 @@ describe('Order Service - IngredientsReserved Event', () => {
   });
 
   test('should change order status to COOKING when IngredientsReserved is received', async () => {
-    // Given: an order exists in WAITING_INGREDIENTS state
-    const orderId = '550e8400-e29b-41d4-a716-446655440000';
-    await pool.query(
-      'INSERT INTO orders (id, total_dishes, status) VALUES ($1, $2, $3)',
-      [orderId, 2, 'WAITING_INGREDIENTS']
-    );
+    const orderId = randomUUID();
+    await dbHelper.createOrder(orderId, 2, 'WAITING_INGREDIENTS');
 
-    // TODO: Implement event handler for IngredientsReserved
-    // TODO: Verify order status changes to COOKING
-    expect(true).toBe(false);
+    const eventId = randomUUID();
+    const event: IngredientsReservedEvent = {
+      eventId,
+      orderId,
+    };
+
+    await orderService.handleIngredientsReserved(event);
+
+    const order = await dbHelper.getOrder(orderId);
+    expect(order.status).toBe('COOKING');
   });
 
   test('should be idempotent for duplicate IngredientsReserved events', async () => {
-    // TODO: Test idempotency
-    expect(true).toBe(false);
+    const orderId = randomUUID();
+        await dbHelper.createOrder(orderId, 2, 'WAITING_INGREDIENTS');
+    
+        const eventId = randomUUID();
+        const event: IngredientsReservedEvent = {
+          eventId,
+          orderId,
+        };
+    
+        await orderService.handleIngredientsReserved(event);
+        const orderAfterFirstHandle = await dbHelper.getOrder(orderId);
+    
+        await orderService.handleIngredientsReserved(event);
+        const orderAfterSecondHandle = await dbHelper.getOrder(orderId);
+    
+        expect(orderAfterFirstHandle.status).toBe('COOKING');
+        expect(orderAfterSecondHandle.status).toBe('COOKING');
+    
+        const processedCount = await pool.query(
+          'SELECT COUNT(*) FROM events_processed WHERE event_id = $1',
+          [eventId]
+        );
+        expect(processedCount.rows[0].count).toBe('1');
   });
 });

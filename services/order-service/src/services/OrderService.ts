@@ -23,6 +23,11 @@ export interface IngredientsPurchaseFailedEvent {
   reason: string;
 }
 
+export interface IngredientsReservedEvent {
+  eventId: string;
+  orderId: string;
+}
+
 export class OrderService {
   constructor(
     private orderRepo: OrderRepository,
@@ -60,9 +65,7 @@ export class OrderService {
     }));
 
     await this.orderRepo.createOrderItems(orderItems);
-
     await this.orderRepo.updateStatus(event.orderId, 'WAITING_INGREDIENTS');
-
     await this.eventRepo.markEventAsProcessed(event.eventId);
   }
 
@@ -72,7 +75,15 @@ export class OrderService {
     }
 
     await this.orderRepo.updateStatus(event.orderId, 'FAILED');
+    await this.eventRepo.markEventAsProcessed(event.eventId);
+  }
 
+  async handleIngredientsReserved(event: IngredientsReservedEvent): Promise<void> {
+    if (await this.eventRepo.isEventProcessed(event.eventId)) {
+      return;
+    }
+
+    await this.orderRepo.updateStatus(event.orderId, 'COOKING');
     await this.eventRepo.markEventAsProcessed(event.eventId);
   }
 }

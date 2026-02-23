@@ -32,7 +32,7 @@ describe('Order Service - IngredientsPurchaseFailed Event', () => {
   });
 
   test('should change order status to FAILED when IngredientsPurchaseFailed is received', async () => {
-    const orderId = '550e8400-e29b-41d4-a716-446655440000';
+    const orderId = randomUUID();
     await dbHelper.createOrder(orderId, 2, 'WAITING_INGREDIENTS');
 
     const eventId = randomUUID();
