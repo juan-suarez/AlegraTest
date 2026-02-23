@@ -12,6 +12,58 @@ Diseñado para soportar alta concurrencia y múltiples instancias por servicio.
 
 ---
 
+# 🚀 Inicio Rápido
+
+## Prerrequisitos
+
+- Node.js 18+
+- Docker y Docker Compose
+- TypeScript (global o local)
+
+## Configuración Inicial
+
+```bash
+# Clonar el repositorio
+git clone <repository-url>
+cd restaurant-system
+
+# Levantar la base de datos global
+docker-compose up -d
+
+# Instalar dependencias de un servicio
+cd services/order-service
+npm install
+
+# Configurar variables de entorno
+cp .env.example .env
+# Editar .env con la configuración de BD
+```
+
+## Desarrollo de un Servicio
+
+```bash
+# Crear base de datos del servicio
+./create-db.sh order_service
+
+# Ejecutar en modo desarrollo
+npm run dev
+
+# Ejecutar tests
+npm test
+
+# Ejecutar tests en modo watch
+npm run test:watch
+```
+
+## Arquitectura de Desarrollo
+
+- **TDD**: Tests primero, luego implementación
+- **Testcontainers**: DB aisladas para tests
+- **Event-driven**: Comunicación asíncrona
+- **Repository Pattern**: Acceso a datos limpio
+
+---
+
 # 🏗️ Arquitectura General
 
 ## Microservicios
@@ -27,13 +79,111 @@ Diseñado para soportar alta concurrencia y múltiples instancias por servicio.
 
 - **Event Bus:** Amazon SNS  
 - **Queues por servicio:** Amazon SQS  
-- **Compute:** AWS Lambda (contenedores Docker)  
+- **Compute:** AWS Lambda (contenedores Docker)
+- **AWS Api Gateway** Api Gateway para conectar el servicio de ordenes con el frontend
 - **Base de datos:** PostgreSQL (una por servicio)  
 - **Infraestructura como código:** AWS CDK  
 - **Observabilidad:** CloudWatch  
 
 No existe comunicación síncrona entre microservicios.  
 Toda interacción es mediante eventos.
+
+---
+
+# 🏛️ Patrón de Diseño Arquitectónico
+
+Todos los microservicios siguen un **patrón de arquitectura limpia** estandarizado para mantener consistencia, mantenibilidad y escalabilidad.
+
+## 📋 Principios Arquitectónicos
+
+### 🎯 Separación de Responsabilidades
+- **Queries SQL** separadas de la lógica de negocio
+- **Acceso a datos** aislado de las reglas del dominio
+- **Tests** independientes del código de producción
+
+### 🔄 Arquitectura por Capas
+
+```
+┌─────────────────┐
+│   Events        │ ← Entrada/Salida de eventos
+├─────────────────┤
+│   Services      │ ← Lógica de negocio
+├─────────────────┤
+│ Repositories    │ ← Acceso a datos
+├─────────────────┤
+│   Database      │ ← PostgreSQL
+└─────────────────┘
+```
+
+## 🏗️ Patrones Implementados
+
+### 1. **Patrón Repository**
+- **Responsabilidad**: Abstraer operaciones de base de datos
+- **Beneficio**: Lógica de BD separada, fácil testing y mocking
+- **Implementación**: Una clase Repository por entidad principal
+- **Ejemplo**: `OrderRepository`, `InventoryRepository`
+
+### 2. **Patrón Service**
+- **Responsabilidad**: Contener lógica de negocio y workflows
+- **Beneficio**: Reglas del dominio centralizadas y reutilizables
+- **Implementación**: Servicios que coordinan repositories y events
+- **Ejemplo**: `OrderService`, `InventoryService`
+
+### 3. **Arquitectura Basada en Eventos**
+- **Responsabilidad**: Comunicación asíncrona entre servicios
+- **Beneficio**: Desacoplamiento, escalabilidad, resiliencia
+- **Implementación**: Handlers para eventos entrantes, publishers para salientes
+- **Ejemplo**: `OrderCreated`, `IngredientsReserved`
+
+### 4. **TDD (Test-Driven Development)**
+- **Responsabilidad**: Desarrollo guiado por tests
+- **Beneficio**: Código confiable, diseño emergente, documentación viva
+- **Implementación**: Tests primero, luego implementación mínima
+- **Herramientas**: Jest + Testcontainers para DB real
+
+### 5. **Testcontainers para Testing**
+- **Responsabilidad**: Proporcionar bases de datos aisladas
+- **Beneficio**: Tests realistas sin dependencias externas
+- **Implementación**: PostgreSQL temporal por suite de tests
+- **Aislamiento**: Cada test suite tiene su propia BD
+
+## 📁 Estructura Estándar por Microservicio
+
+```
+service-name/
+├── src/
+│   ├── db/
+│   │   ├── connection.ts      # Conexión PostgreSQL
+│   │   ├── schema.sql         # Schema inicial
+│   │   └── queries/           # SQL organizado
+│   ├── repositories/          # Patrón Repository
+│   ├── services/              # Lógica de negocio
+│   ├── events/                # Handlers & Publishers
+│   └── __tests__/             # Tests TDD
+├── package.json
+├── tsconfig.json
+├── jest.config.js
+└── README.md
+```
+
+## 🎯 Beneficios del Patrón
+
+### Para Desarrolladores
+- ✅ **Consistencia**: Todos los servicios siguen el mismo patrón
+- ✅ **Productividad**: Estructura familiar acelera desarrollo
+- ✅ **Mantenibilidad**: Código organizado y fácil de entender
+- ✅ **Testing**: Alta cobertura con tests automatizados
+
+### Para el Sistema
+- ✅ **Escalabilidad**: Servicios independientes y desacoplados
+- ✅ **Resiliencia**: Fallos aislados, recuperación automática
+- ✅ **Observabilidad**: Logs y métricas consistentes
+- ✅ **Evolución**: Fácil agregar nuevas funcionalidades
+
+### Para el Negocio
+- ✅ **Confiabilidad**: Tests exhaustivos reducen bugs
+- ✅ **Velocidad**: Desarrollo TDD acelera delivery
+- ✅ **Calidad**: Arquitectura probada y madura
 
 ---
 

@@ -16,6 +16,63 @@ Su única responsabilidad es el ciclo de vida de la orden.
 
 ---
 
+# 🚀 Inicio Rápido
+
+## Prerrequisitos
+
+- Node.js 18+
+- Docker y Docker Compose
+- PostgreSQL (levantado con Docker Compose en el directorio raíz)
+
+## Instalación
+
+```bash
+# Instalar dependencias
+npm install
+
+# Configurar variables de entorno
+cp .env.example .env
+# Editar .env con la configuración de BD
+```
+
+## Levantar Base de Datos
+
+```bash
+# Desde el directorio raíz del proyecto
+docker-compose up -d
+
+# Crear la base de datos del servicio (opcional, si no usas init scripts)
+./create-db.sh order_service
+```
+
+## Desarrollo
+
+```bash
+# Ejecutar en modo desarrollo
+npm run dev
+
+# Ejecutar tests
+npm test
+
+# Ejecutar tests en modo watch
+npm run test:watch
+
+# Ejecutar tests con cobertura
+npm run test:coverage
+```
+
+## Compilación y Producción
+
+```bash
+# Compilar TypeScript
+npm run build
+
+# Ejecutar versión compilada
+npm start
+```
+
+---
+
 # 1. Estados de una Orden
 
 Una orden puede estar en los siguientes estados:
@@ -198,3 +255,77 @@ No:
 ✘ Cocina  
 
 ---
+
+# 🏗️ Arquitectura y Patrones de Diseño
+
+Este servicio implementa una **arquitectura limpia** con separación clara de responsabilidades:
+
+## Estructura de Directorios
+
+```
+src/
+├── db/
+│   ├── connection.ts          # Conexión a PostgreSQL
+│   ├── schema.sql             # Schema de base de datos
+│   └── queries/               # Queries SQL organizadas
+├── repositories/              # Patrón Repository - Acceso a datos
+│   ├── OrderRepository.ts     # CRUD de órdenes
+│   └── EventRepository.ts     # Gestión de idempotencia
+├── services/                  # Lógica de negocio
+│   └── OrderService.ts        # Reglas del dominio
+├── events/                    # Arquitectura basada en eventos
+│   ├── handlers/              # Procesadores de eventos entrantes
+│   └── publishers/            # Publicadores de eventos salientes
+└── __tests__/                 # Tests con TDD
+    ├── helpers/               # Utilidades de testing
+    └── events/                # Tests por funcionalidad
+```
+
+## 🏛️ Patrones Implementados
+
+### 1. Patrón Repository
+- **Propósito**: Abstraer el acceso a datos
+- **Beneficio**: Lógica de BD separada de reglas de negocio
+- **Uso**: `OrderRepository` para operaciones CRUD
+
+### 2. Patrón Service
+- **Propósito**: Contener lógica de negocio
+- **Beneficio**: Reglas del dominio centralizadas
+- **Uso**: `OrderService` para workflows complejos
+
+### 3. Arquitectura Basada en Eventos
+- **Propósito**: Comunicación desacoplada entre servicios
+- **Beneficio**: Escalabilidad y resiliencia
+- **Uso**: Handlers para eventos entrantes, publishers para salientes
+
+### 4. TDD (Test-Driven Development)
+- **Propósito**: Desarrollo guiado por tests
+- **Beneficio**: Código confiable y bien testeado
+- **Uso**: Tests primero, luego implementación
+
+### 5. Testcontainers
+- **Propósito**: Bases de datos aisladas para tests
+- **Beneficio**: Tests realistas sin dependencias externas
+- **Uso**: PostgreSQL temporal por suite de tests
+
+## 🔄 Flujo de Desarrollo TDD
+
+1. **Escribir test** que falle (describe el comportamiento esperado)
+2. **Implementar código mínimo** para que el test pase
+3. **Refactorizar** manteniendo tests verdes
+4. **Repetir** para siguiente funcionalidad
+
+## 🧪 Estrategia de Testing
+
+- **Unit Tests**: Lógica de negocio con DB real (Testcontainers)
+- **Integration Tests**: Flujos completos de eventos
+- **Event Tests**: Cada evento tiene su propio archivo de tests
+- **Helpers**: Utilidades para setup rápido de datos de test
+
+## 📊 Beneficios de Esta Arquitectura
+
+- ✅ **Mantenibilidad**: Código organizado y fácil de entender
+- ✅ **Testabilidad**: Alta cobertura con tests aislados
+- ✅ **Escalabilidad**: Fácil agregar nuevas funcionalidades
+- ✅ **Consistencia**: Patrones aplicados uniformemente
+- ✅ **Reutilización**: Repositories compartidos entre servicios
