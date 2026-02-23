@@ -15,6 +15,13 @@ export interface OrderItemsSelectedEvent {
   }>;
 }
 
+export interface IngredientsPurchaseFailedEvent {
+  eventId: string;
+  orderId: string;
+  ingredientId: string;
+  reason: string;
+}
+
 export class OrderService {
   constructor(
     private orderRepo: OrderRepository,
@@ -23,13 +30,10 @@ export class OrderService {
   ) {}
 
   async createOrder(orderId: string, totalDishes: number): Promise<OrderCreatedEvent> {
-    // Crear la orden
     const order = await this.orderRepo.create(orderId, totalDishes);
 
-    // Cambiar estado a SELECTING_RECIPES
     await this.orderRepo.updateStatus(orderId, 'SELECTING_RECIPES');
 
-    // Publicar evento
     const event: OrderCreatedEvent = {
       orderId,
       totalDishes,
@@ -42,14 +46,12 @@ export class OrderService {
   }
 
   async handleOrderItemsSelected(event: OrderItemsSelectedEvent): Promise<void> {
-    // Verificar idempotencia
     if (await this.eventRepo.isEventProcessed(event.eventId)) {
-      return; // Evento ya procesado
+      return; 
     }
 
-    // Crear items de orden
     const orderItems = event.items.map((item, index) => ({
-      id: `${event.eventId}-item-${index}`, // Generar IDs únicos
+      id: `${event.eventId}-item-${index}`, 
       order_id: event.orderId,
       recipe_id: item.recipeId,
       quantity: item.quantity
@@ -57,10 +59,18 @@ export class OrderService {
 
     await this.orderRepo.createOrderItems(orderItems);
 
-    // Cambiar estado
     await this.orderRepo.updateStatus(event.orderId, 'WAITING_INGREDIENTS');
 
-    // Marcar evento como procesado
+    await this.eventRepo.markEventAsProcessed(event.eventId);
+  }
+
+  async handleIngredientsPurchaseFailed(event: IngredientsPurchaseFailedEvent): Promise<void> {
+    if (await this.eventRepo.isEventProcessed(event.eventId)) {
+      return;
+    }
+
+    await this.orderRepo.updateStatus(event.orderId, 'FAILED');
+
     await this.eventRepo.markEventAsProcessed(event.eventId);
   }
 }
