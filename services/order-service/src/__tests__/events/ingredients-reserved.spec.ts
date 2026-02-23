@@ -45,31 +45,29 @@ describe('Order Service - IngredientsReserved Event', () => {
 
     const order = await dbHelper.getOrder(orderId);
     expect(order.status).toBe('COOKING');
+    expect(await dbHelper.isEventProcessed(eventId)).toBe(true);
   });
 
   test('should be idempotent for duplicate IngredientsReserved events', async () => {
     const orderId = randomUUID();
-        await dbHelper.createOrder(orderId, 2, 'WAITING_INGREDIENTS');
-    
-        const eventId = randomUUID();
-        const event: IngredientsReservedEvent = {
-          eventId,
-          orderId,
-        };
-    
-        await orderService.handleIngredientsReserved(event);
-        const orderAfterFirstHandle = await dbHelper.getOrder(orderId);
-    
-        await orderService.handleIngredientsReserved(event);
-        const orderAfterSecondHandle = await dbHelper.getOrder(orderId);
-    
-        expect(orderAfterFirstHandle.status).toBe('COOKING');
-        expect(orderAfterSecondHandle.status).toBe('COOKING');
-    
-        const processedCount = await pool.query(
-          'SELECT COUNT(*) FROM events_processed WHERE event_id = $1',
-          [eventId]
-        );
-        expect(processedCount.rows[0].count).toBe('1');
+    await dbHelper.createOrder(orderId, 2, 'WAITING_INGREDIENTS');
+
+    const eventId = randomUUID();
+    const event: IngredientsReservedEvent = {
+      eventId,
+      orderId,
+    };
+
+    await orderService.handleIngredientsReserved(event);
+    const orderAfterFirstHandle = await dbHelper.getOrder(orderId);
+
+    await orderService.handleIngredientsReserved(event);
+    const orderAfterSecondHandle = await dbHelper.getOrder(orderId);
+
+    expect(orderAfterFirstHandle.status).toBe('COOKING');
+    expect(orderAfterSecondHandle.status).toBe('COOKING');
+
+    const processedCount = await dbHelper.getProcessedEventCount(eventId);
+    expect(processedCount).toBe(1);
   });
 });

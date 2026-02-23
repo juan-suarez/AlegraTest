@@ -19,11 +19,15 @@ export interface OrderItemsSelectedEvent {
 export interface IngredientsPurchaseFailedEvent {
   eventId: string;
   orderId: string;
-  ingredientId: string;
   reason: string;
 }
 
 export interface IngredientsReservedEvent {
+  eventId: string;
+  orderId: string;
+}
+
+export interface OrderCompletedEvent {
   eventId: string;
   orderId: string;
 }
@@ -56,7 +60,6 @@ export class OrderService {
       return;
     }
 
-    // Kitchen-service envía los IDs, solo mapamos a la estructura del repositorio
     const orderItems = event.items.map((item) => ({
       id: item.id,
       order_id: event.orderId,
@@ -84,6 +87,15 @@ export class OrderService {
     }
 
     await this.orderRepo.updateStatus(event.orderId, 'COOKING');
+    await this.eventRepo.markEventAsProcessed(event.eventId);
+  }
+
+  async handleOrderCompleted(event: OrderCompletedEvent): Promise<void> {
+    if (await this.eventRepo.isEventProcessed(event.eventId)) {
+      return;
+    }
+
+    await this.orderRepo.updateStatus(event.orderId, 'COMPLETED');
     await this.eventRepo.markEventAsProcessed(event.eventId);
   }
 }

@@ -18,13 +18,6 @@ export class TestDatabaseHelper {
     );
   }
 
-  async markEventAsProcessed(eventId: string) {
-    await this.pool.query(
-      'INSERT INTO events_processed (event_id) VALUES ($1)',
-      [eventId]
-    );
-  }
-
   async getOrder(orderId: string) {
     const result = await this.pool.query('SELECT * FROM orders WHERE id = $1', [orderId]);
     return result.rows[0];
@@ -41,5 +34,13 @@ export class TestDatabaseHelper {
       [eventId]
     );
     return result.rows.length > 0;
+  }
+
+  async getProcessedEventCount(eventId: string): Promise<number> {
+    const result = await this.pool.query(
+      'SELECT COUNT(*) FROM events_processed WHERE event_id = $1',
+      [eventId]
+    );
+    return parseInt(result.rows[0].count, 10);
   }
 }

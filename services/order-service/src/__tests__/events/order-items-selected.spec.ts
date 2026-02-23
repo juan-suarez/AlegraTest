@@ -78,6 +78,7 @@ describe('Order Service - OrderItemsSelected Event', () => {
     const orderItems = await dbHelper.getOrderItems(orderId);
     expect(orderItems).toHaveLength(3);
     expect(orderItems.map(item => item.quantity)).toEqual([1, 2, 1]);
+    expect(await dbHelper.isEventProcessed(eventId)).toBe(true);
   });
 
   test('should be idempotent for duplicate OrderItemsSelected events', async () => {
@@ -103,10 +104,7 @@ describe('Order Service - OrderItemsSelected Event', () => {
     expect(itemsAfterFirstHandle).toHaveLength(2);
     expect(itemsAfterSecondHandle).toHaveLength(2);
 
-    const processedCount = await pool.query(
-      'SELECT COUNT(*) FROM events_processed WHERE event_id = $1',
-      [eventId]
-    );
-    expect(processedCount.rows[0].count).toBe('1');
+    const processedCount = await dbHelper.getProcessedEventCount(eventId);
+    expect(processedCount).toBe(1);
   });
 });

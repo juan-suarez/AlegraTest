@@ -1,15 +1,26 @@
 import { Pool } from 'pg';
 import { type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { startTestDatabase, stopTestDatabase, cleanDatabase } from '../helpers/database';
+import { randomUUID } from 'node:crypto';
+import { OrderCompletedEvent, OrderService } from '../../services/OrderService';
+import { TestDatabaseHelper } from '../helpers/test-helpers';
+import { EventRepository, OrderRepository } from '../../repositories';
 
 describe('Order Service - OrderCompleted Event', () => {
   let pool: Pool;
   let container: StartedPostgreSqlContainer;
+  let dbHelper: TestDatabaseHelper;
+  let orderService: OrderService;
 
   beforeAll(async () => {
     const { pool: testPool, container: testContainer } = await startTestDatabase();
     pool = testPool;
     container = testContainer;
+
+    dbHelper = new TestDatabaseHelper(pool);
+    const orderRepo = new OrderRepository(pool);
+    const eventRepo = new EventRepository(pool);
+    orderService = new OrderService(orderRepo, eventRepo, null!);
   });
 
   afterAll(async () => {
@@ -21,21 +32,42 @@ describe('Order Service - OrderCompleted Event', () => {
   });
 
   test('should change order status to COMPLETED when OrderCompleted is received', async () => {
-    // Given: an order exists in COOKING state
-    const orderId = '550e8400-e29b-41d4-a716-446655440000';
-    await pool.query(
-      'INSERT INTO orders (id, total_dishes, status) VALUES ($1, $2, $3)',
-      [orderId, 2, 'COOKING']
-    );
+    const orderId = randomUUID();
+    await dbHelper.createOrder(orderId, 2, 'COOKING');
 
-    // TODO: Implement event handler for OrderCompleted
-    // TODO: Verify order status changes to COMPLETED
-    // TODO: Verify updated_at is updated
-    expect(true).toBe(false);
+    const eventId = randomUUID();
+    const event: OrderCompletedEvent = {
+      eventId,
+      orderId
+    };
+
+    await orderService.handleOrderCompleted(event);
+
+    const order = await dbHelper.getOrder(orderId);
+    expect(order.status).toBe('COMPLETED');
+    expect(await dbHelper.isEventProcessed(eventId)).toBe(true);
   });
 
   test('should be idempotent for duplicate OrderCompleted events', async () => {
-    // TODO: Test idempotency
-    expect(true).toBe(false);
+    const orderId = randomUUID();
+    await dbHelper.createOrder(orderId, 2, 'WAITING_INGREDIENTS');
+
+    const eventId = randomUUID();
+    const event: OrderCompletedEvent = {
+      eventId,
+      orderId,
+    };
+
+    await orderService.handleOrderCompleted(event);
+    const orderAfterFirstHandle = await dbHelper.getOrder(orderId);
+
+    await orderService.handleOrderCompleted(event);
+    const orderAfterSecondHandle = await dbHelper.getOrder(orderId);
+
+    expect(orderAfterFirstHandle.status).toBe('COMPLETED');
+    expect(orderAfterSecondHandle.status).toBe('COMPLETED');
+
+    const processedCount = await dbHelper.getProcessedEventCount(eventId);
+    expect(processedCount).toBe(1);
   });
 });

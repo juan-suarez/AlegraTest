@@ -39,7 +39,6 @@ describe('Order Service - IngredientsPurchaseFailed Event', () => {
     const event: IngredientsPurchaseFailedEvent = {
       eventId,
       orderId,
-      ingredientId: randomUUID(),
       reason: 'Insufficient stock'
     };
 
@@ -58,7 +57,6 @@ describe('Order Service - IngredientsPurchaseFailed Event', () => {
     const event: IngredientsPurchaseFailedEvent = {
       eventId,
       orderId,
-      ingredientId: randomUUID(),
       reason: 'Insufficient stock'
     };
 
@@ -71,10 +69,7 @@ describe('Order Service - IngredientsPurchaseFailed Event', () => {
     expect(orderAfterFirstHandle.status).toBe('FAILED');
     expect(orderAfterSecondHandle.status).toBe('FAILED');
 
-    const processedCount = await pool.query(
-      'SELECT COUNT(*) FROM events_processed WHERE event_id = $1',
-      [eventId]
-    );
-    expect(processedCount.rows[0].count).toBe('1');
+    const processedCount = await dbHelper.getProcessedEventCount(eventId);
+    expect(processedCount).toBe(1);
   });
 });
