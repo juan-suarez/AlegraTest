@@ -80,7 +80,10 @@ export class EventRouter {
   private async routeEvent(envelope: EventEnvelope): Promise<void> {
     const { eventType, data } = envelope;
 
-    console.log(`🔀 Routing event: ${eventType}`);
+    console.log(`🔀 Routing event: ${eventType}`, {
+      eventId: envelope.eventId,
+      source: envelope.source,
+    });
 
     try {
       switch (eventType) {
@@ -101,10 +104,15 @@ export class EventRouter {
           break;
 
         default:
-          console.warn(`⚠️  Unhandled event type: ${eventType}`);
+          console.warn(`⚠️  Unhandled event type: ${eventType}`, {
+            eventId: envelope.eventId,
+          });
       }
     } catch (error) {
-      console.error(`❌ Error routing event ${eventType}:`, error);
+      console.error(`❌ Error routing event ${eventType}`, {
+        eventId: envelope.eventId,
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }

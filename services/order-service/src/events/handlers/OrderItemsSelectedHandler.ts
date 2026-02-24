@@ -9,7 +9,13 @@ export class OrderItemsSelectedHandler {
       this.validateEventStructure(event);
       await this.useCase.execute(event);
     } catch (error) {
-      console.error('❌ Error in OrderItemsSelectedHandler:', error);
+      console.error('❌ Error in OrderItemsSelectedHandler', {
+        eventId: event.eventId,
+        orderId: event.orderId,
+        itemCount: event.items?.length,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       throw error;
     }
   }

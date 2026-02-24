@@ -9,7 +9,12 @@ export class OrderCompletedHandler {
       this.validateEventStructure(event);
       await this.useCase.execute(event);
     } catch (error) {
-      console.error('❌ Error in OrderCompletedHandler:', error);
+      console.error('❌ Error in OrderCompletedHandler', {
+        eventId: event.eventId,
+        orderId: event.orderId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       throw error;
     }
   }

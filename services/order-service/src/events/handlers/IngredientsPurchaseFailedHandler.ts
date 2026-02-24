@@ -9,7 +9,12 @@ export class IngredientsPurchaseFailedHandler {
       this.validateEventStructure(event);
       await this.useCase.execute(event);
     } catch (error) {
-      console.error('❌ Error in IngredientsPurchaseFailedHandler:', error);
+      console.error('❌ Error in IngredientsPurchaseFailedHandler', {
+        eventId: event.eventId,
+        orderId: event.orderId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       throw error;
     }
   }

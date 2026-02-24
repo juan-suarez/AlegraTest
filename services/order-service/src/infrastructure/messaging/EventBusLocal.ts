@@ -50,9 +50,16 @@ export class EventBusLocal {
 
     try {
       await this.snsClient.send(command);
-      console.log(`📤 Published ${eventType} to ${topicName}`);
+      console.log(`📤 Published ${eventType} to ${topicName}`, {
+        eventId: envelope.eventId,
+        source,
+      });
     } catch (error) {
-      console.error(`❌ Error publishing event to ${topicName}:`, error);
+      console.error(`❌ Error publishing event to ${topicName}`, {
+        eventType,
+        source,
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }
@@ -81,7 +88,10 @@ export class EventBusLocal {
         // Esperar antes del siguiente poll
         await this.sleep(this.config.pollingIntervalMs);
       } catch (error) {
-        console.error('❌ Error in SQS consumer loop:', error);
+        console.error('❌ Error in SQS consumer loop', {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+        });
         // Esperar antes de reintentar
         await this.sleep(this.config.pollingIntervalMs);
       }
@@ -126,7 +136,14 @@ export class EventBusLocal {
       const snsMessage = JSON.parse(message.Body);
       const eventEnvelope: EventEnvelope = JSON.parse(snsMessage.Message);
 
-      console.log(`📨 Processing event: ${eventEnvelope.eventType} (${eventEnvelope.eventId})`);
+      // Capturar número de intentos
+      const receiveCount = message.Attributes?.ApproximateReceiveCount || '1';
+
+      console.log(`📨 Processing event: ${eventEnvelope.eventType}`, {
+        eventId: eventEnvelope.eventId,
+        source: eventEnvelope.source,
+        attemptNumber: receiveCount,
+      });
 
       // Delegar a handler
       await handler(eventEnvelope);
@@ -134,11 +151,21 @@ export class EventBusLocal {
       // Eliminar mensaje de la cola
       await this.deleteMessage(message);
       
-      console.log(`✅ Successfully processed: ${eventEnvelope.eventType}`);
+      console.log(`✅ Successfully processed: ${eventEnvelope.eventType}`, {
+        eventId: eventEnvelope.eventId,
+      });
     } catch (error) {
-      console.error('❌ Error processing message:', error);
-      // En producción aquí irías a DLQ
-      // Por ahora, el mensaje volverá a la cola después del visibility timeout
+      const receiveCount = message.Attributes?.ApproximateReceiveCount || '1';
+      
+      console.error('❌ Error processing message', {
+        attemptNumber: receiveCount,
+        messageId: message.MessageId,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      
+      // El mensaje volverá a la cola después del visibility timeout
+      throw error;
     }
   }
 
