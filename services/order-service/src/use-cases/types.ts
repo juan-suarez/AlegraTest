@@ -1,5 +1,5 @@
 /**
- * Shared types and interfaces for order service
+ * Shared types and interfaces for order service use cases
  */
 
 export interface Order {
@@ -16,6 +16,11 @@ export interface OrderItem {
   recipe_id: string;
   quantity: number;
   created_at: Date;
+}
+
+export interface CreateOrderInput {
+  orderId: string;
+  totalDishes: number;
 }
 
 export interface OrderCreatedEvent {
@@ -37,7 +42,6 @@ export interface OrderItemsSelectedEvent {
 export interface IngredientsPurchaseFailedEvent {
   eventId: string;
   orderId: string;
-  reason: string;
 }
 
 export interface IngredientsReservedEvent {

@@ -2,16 +2,21 @@ import { Pool } from 'pg';
 import { type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { startTestDatabase, stopTestDatabase, cleanDatabase } from '../helpers/database';
 import { TestDatabaseHelper } from '../helpers/test-helpers';
-import { OrderService } from '../../services/OrderService';
-import { EventRepository, OrderRepository } from '../../repositories';
+import { createMockEventBus } from '../helpers/eventbus';
+import { OrderRepository } from '../../repositories';
+import { CreateOrderUseCase } from '../../use-cases/CreateOrderUseCase';
+import { EventBusLocal } from '../../infrastructure/messaging';
 import { randomUUID } from 'node:crypto';
+
+// Mock EventBusLocal
+jest.mock('../../infrastructure/messaging/EventBusLocal');
 
 describe('Order Service - OrderCreated Event', () => {
   let pool: Pool;
   let container: StartedPostgreSqlContainer;
   let dbHelper: TestDatabaseHelper;
-  let orderService: OrderService;
-  let mockPublisher: { published: Array<any>; publish: (type: string, event: any) => Promise<void> };
+  let createOrderUseCase: CreateOrderUseCase;
+  let mockEventBus: jest.Mocked<EventBusLocal>;
 
   beforeAll(async () => {
     const { pool: testPool, container: testContainer } = await startTestDatabase();
@@ -19,15 +24,6 @@ describe('Order Service - OrderCreated Event', () => {
     container = testContainer;
 
     dbHelper = new TestDatabaseHelper(pool);
-    const orderRepo = new OrderRepository(pool);
-    const eventRepo = new EventRepository(pool);
-    mockPublisher = {
-      published: [],
-      async publish(type: string, event: any) {
-        this.published.push({ type, event });
-      }
-    };
-    orderService = new OrderService(orderRepo, eventRepo, mockPublisher as any);
   });
 
   afterAll(async () => {
@@ -35,40 +31,65 @@ describe('Order Service - OrderCreated Event', () => {
   });
 
   beforeEach(async () => {
-    mockPublisher.published = []; 
     await cleanDatabase(pool);
+
+    mockEventBus = createMockEventBus();
+
+    const orderRepo = new OrderRepository(pool);
+    createOrderUseCase = new CreateOrderUseCase(orderRepo, mockEventBus);
   });
 
-  test('should create an order and emit OrderCreated event', async () => {
+  test('should create an order and publish OrderCreated event', async () => {
     const orderId = randomUUID();
-    await orderService.createOrder(orderId, 3);
+    
+    const event = await createOrderUseCase.execute({ orderId, totalDishes: 2 });
 
-    const order = await dbHelper.getOrder(orderId);
+    const order = await dbHelper.getOrder(event.orderId);
     expect(order).not.toBeNull();
     expect(order.id).toBe(orderId);
+    expect(order.total_dishes).toBe(2);
     expect(order.status).toBe('SELECTING_RECIPES');
 
-    expect(mockPublisher.published.length).toBe(1);
-    const published = mockPublisher.published[0];
-    expect(published.type).toBe('OrderCreated');
-    expect(published.event).toMatchObject(
-    { 
-      orderId,
-      totalDishes: 3 
-    });
+    expect(mockEventBus.publish).toHaveBeenCalledTimes(1);
+    expect(mockEventBus.publish).toHaveBeenCalledWith(
+      'order-events',
+      'OrderCreated',
+      expect.objectContaining({
+        orderId,
+        totalDishes: 2,
+      }),
+      'order-service'
+    );
   });
 
-  test('should be idempotent for duplicate OrderCreated calls', async () => {
-    const orderId = randomUUID();
-    await orderService.createOrder(orderId, 3);
-    expect(mockPublisher.published.length).toBe(1);
+  test('should handle multiple orders independently', async () => {
+    const orderId1 = randomUUID();
+    const orderId2 = randomUUID();
+    
+    const event1 = await createOrderUseCase.execute({ orderId: orderId1, totalDishes: 3 });
+    const event2 = await createOrderUseCase.execute({ orderId: orderId2, totalDishes: 5 });
 
-    await orderService.createOrder(orderId, 3);
-    expect(mockPublisher.published.length).toBe(1);
+    const order1 = await dbHelper.getOrder(event1.orderId);
+    const order2 = await dbHelper.getOrder(event2.orderId);
 
-    const order = await dbHelper.getOrder(orderId);
-    expect(order.id).toBe(orderId);
-    expect(order.status).toBe('SELECTING_RECIPES');
+    expect(order1.total_dishes).toBe(3);
+    expect(order2.total_dishes).toBe(5);
+    expect(order1.id).not.toBe(order2.id);
+
+    expect(mockEventBus.publish).toHaveBeenCalledTimes(2);
+    expect(mockEventBus.publish).toHaveBeenNthCalledWith(
+      1,
+      'order-events',
+      'OrderCreated',
+      expect.objectContaining({ orderId: orderId1, totalDishes: 3 }),
+      'order-service'
+    );
+    expect(mockEventBus.publish).toHaveBeenNthCalledWith(
+      2,
+      'order-events',
+      'OrderCreated',
+      expect.objectContaining({ orderId: orderId2, totalDishes: 5 }),
+      'order-service'
+    );
   });
-
 });

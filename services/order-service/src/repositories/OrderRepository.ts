@@ -1,5 +1,5 @@
 import { Pool } from 'pg';
-import { Order, OrderItem } from '../services/types';
+import { Order, OrderItem } from '../use-cases/types';
 import { OrderItemsRepository } from './OrderItemsRepository';
 
 export class OrderRepository {

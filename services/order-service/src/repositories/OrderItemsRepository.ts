@@ -1,5 +1,5 @@
 import { Pool } from 'pg';
-import { OrderItem } from '../services/types';
+import { OrderItem } from '../use-cases/types';
 
 export class OrderItemsRepository {
   constructor(private pool: Pool) {}

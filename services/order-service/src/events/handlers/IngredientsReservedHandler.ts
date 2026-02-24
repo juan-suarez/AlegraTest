@@ -1,20 +1,20 @@
-import { HandleIngredientsPurchaseFailedUseCase } from '../../use-cases';
-import { IngredientsPurchaseFailedEvent } from '../../use-cases/types';
+import { HandleIngredientsReservedUseCase } from '../../use-cases';
+import { IngredientsReservedEvent } from '../../use-cases/types';
 
-export class IngredientsPurchaseFailedHandler {
-  constructor(private useCase: HandleIngredientsPurchaseFailedUseCase) {}
+export class IngredientsReservedHandler {
+  constructor(private useCase: HandleIngredientsReservedUseCase) {}
 
-  async handle(event: IngredientsPurchaseFailedEvent): Promise<void> {
+  async handle(event: IngredientsReservedEvent): Promise<void> {
     try {
       this.validateEventStructure(event);
       await this.useCase.execute(event);
     } catch (error) {
-      console.error('❌ Error in IngredientsPurchaseFailedHandler:', error);
+      console.error('❌ Error in IngredientsReservedHandler:', error);
       throw error;
     }
   }
 
-  private validateEventStructure(event: IngredientsPurchaseFailedEvent): void {
+  private validateEventStructure(event: IngredientsReservedEvent): void {
     if (!event || typeof event !== 'object') {
       throw new Error('Event must be an object');
     }
