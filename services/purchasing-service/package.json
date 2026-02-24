@@ -1,7 +1,7 @@
 {
-  "name": "kitchen-service",
+  "name": "purchasing-service",
   "version": "1.0.0",
-  "description": "El `kitchen-service` es responsable de:",
+  "description": "El `purchasing-service` es responsable de:",
   "main": "index.js",
   "scripts": {
     "build": "tsc",
