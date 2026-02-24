@@ -6,6 +6,14 @@ CREATE TABLE IF NOT EXISTS events_processed (
 
 CREATE INDEX IF NOT EXISTS idx_events_processed_event_id ON events_processed(event_id);
 
+-- Tabla para rastrear órdenes que ya recibieron evento de fallo de compra
+CREATE TABLE IF NOT EXISTS orders_purchase_failed_published (
+    order_id UUID PRIMARY KEY,
+    published_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_orders_purchase_failed_published ON orders_purchase_failed_published(order_id);
+
 -- Tabla de ingredientes (fuente de verdad del stock)
 CREATE TABLE IF NOT EXISTS ingredients (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
