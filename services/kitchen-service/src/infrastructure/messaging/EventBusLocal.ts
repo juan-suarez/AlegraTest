@@ -6,7 +6,7 @@ import {
   Message 
 } from '@aws-sdk/client-sqs';
 import { EventEnvelope, EventBusConfig, MessageHandler } from './types';
-import { randomUUID } from "node:crypto"
+import { randomUUID } from 'node:crypto';
 
 export class EventBusLocal {
   private snsClient: SNSClient;
@@ -192,5 +192,4 @@ export class EventBusLocal {
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
-
 }
