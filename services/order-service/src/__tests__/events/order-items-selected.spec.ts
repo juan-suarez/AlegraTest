@@ -2,16 +2,17 @@ import { Pool } from 'pg';
 import { type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { startTestDatabase, stopTestDatabase, cleanDatabase } from '../helpers/database';
 import { TestDatabaseHelper } from '../helpers/test-helpers';
-import { OrderService } from '../../services/OrderService';
+import { OrderItemsSelectedHandler } from '../../events/handlers';
+import { HandleOrderItemsSelectedUseCase } from '../../use-cases';
 import { OrderRepository, EventRepository } from '../../repositories';
 import { randomUUID } from 'node:crypto';
-import { OrderItemsSelectedEvent } from '../../services/types';
+import { OrderItemsSelectedEvent } from '../../use-cases/types';
 
 describe('Order Service - OrderItemsSelected Event', () => {
   let pool: Pool;
   let container: StartedPostgreSqlContainer;
   let dbHelper: TestDatabaseHelper;
-  let orderService: OrderService;
+  let handler: OrderItemsSelectedHandler;
 
   beforeAll(async () => {
     const { pool: testPool, container: testContainer } = await startTestDatabase();
@@ -21,7 +22,8 @@ describe('Order Service - OrderItemsSelected Event', () => {
 
     const orderRepo = new OrderRepository(pool);
     const eventRepo = new EventRepository(pool);
-    orderService = new OrderService(orderRepo, eventRepo, null!);
+    const useCase = new HandleOrderItemsSelectedUseCase(orderRepo, eventRepo);
+    handler = new OrderItemsSelectedHandler(useCase);
   });
 
   afterAll(async () => {
@@ -46,7 +48,7 @@ describe('Order Service - OrderItemsSelected Event', () => {
       ]
     };
 
-    await orderService.handleOrderItemsSelected(event);
+    await handler.handle(event);
 
     const orderItems = await dbHelper.getOrderItems(orderId);
     expect(orderItems).toHaveLength(2);
@@ -74,7 +76,7 @@ describe('Order Service - OrderItemsSelected Event', () => {
       ]
     };
 
-    await orderService.handleOrderItemsSelected(event);
+    await handler.handle(event);
 
     const orderItems = await dbHelper.getOrderItems(orderId);
     expect(orderItems).toHaveLength(3);
@@ -96,10 +98,10 @@ describe('Order Service - OrderItemsSelected Event', () => {
       ]
     };
 
-    await orderService.handleOrderItemsSelected(event);
+    await handler.handle(event);
     const itemsAfterFirstHandle = await dbHelper.getOrderItems(orderId);
 
-    await orderService.handleOrderItemsSelected(event);
+    await handler.handle(event);
     const itemsAfterSecondHandle = await dbHelper.getOrderItems(orderId);
 
     expect(itemsAfterFirstHandle).toHaveLength(2);

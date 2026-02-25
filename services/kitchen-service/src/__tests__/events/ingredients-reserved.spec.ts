@@ -2,34 +2,28 @@ import { Pool } from 'pg';
 import { type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { startTestDatabase, stopTestDatabase, cleanDatabase } from '../helpers/database';
 import { TestDatabaseHelper } from '../helpers/test-helpers';
-import { KitchenService, EventPublisher } from '../../services/KitchenService';
+import { createMockEventBus } from '../helpers/eventbus';
 import { EventRepository } from '../../repositories';
 import { IngredientsReservedHandler } from '../../events/handlers';
+import { HandleIngredientsReservedUseCase } from '../../use-cases';
+import { EventBusLocal } from '../../infrastructure/messaging';
 import { randomUUID } from 'node:crypto';
+
+// Mock EventBusLocal
+jest.mock('../../infrastructure/messaging/EventBusLocal');
 
 describe('Kitchen Service - IngredientsReserved Event', () => {
   let pool: Pool;
   let container: StartedPostgreSqlContainer;
   let dbHelper: TestDatabaseHelper;
-  let kitchenService: KitchenService;
   let ingredientsReservedHandler: IngredientsReservedHandler;
-  let mockPublisher: { published: Array<any>; publish: (type: string, event: any) => Promise<void> };
+  let mockEventBus: jest.Mocked<EventBusLocal>;
 
   beforeAll(async () => {
     const { pool: testPool, container: testContainer } = await startTestDatabase();
     pool = testPool;
     container = testContainer;
     dbHelper = new TestDatabaseHelper(pool);
-
-    const eventRepo = new EventRepository(pool);
-    mockPublisher = {
-      published: [],
-      async publish(type: string, event: any) {
-        this.published.push({ type, event });
-      }
-    };
-    kitchenService = new KitchenService(eventRepo, mockPublisher as any);
-    ingredientsReservedHandler = new IngredientsReservedHandler(kitchenService);
   });
 
   afterAll(async () => {
@@ -37,8 +31,13 @@ describe('Kitchen Service - IngredientsReserved Event', () => {
   });
 
   beforeEach(async () => {
-    mockPublisher.published = [];
     await cleanDatabase(pool);
+
+    mockEventBus = createMockEventBus();
+
+    const eventRepo = new EventRepository(pool);
+    const useCase = new HandleIngredientsReservedUseCase(eventRepo, mockEventBus);
+    ingredientsReservedHandler = new IngredientsReservedHandler(useCase);
   });
 
   test('should publish OrderCompleted when IngredientsReserved is received', async () => {
@@ -52,11 +51,15 @@ describe('Kitchen Service - IngredientsReserved Event', () => {
     await ingredientsReservedHandler.handle(event);
 
     expect(await dbHelper.isEventProcessed(eventId)).toBe(true);
-    expect(mockPublisher.published).toHaveLength(1);
-
-    const completedPublished = mockPublisher.published[0];
-    expect(completedPublished.type).toBe('OrderCompleted');
-    expect(completedPublished.event.orderId).toBe(orderId);
+    expect(mockEventBus.publish).toHaveBeenCalledTimes(1);
+    expect(mockEventBus.publish).toHaveBeenCalledWith(
+      'order-events',
+      'OrderCompleted',
+      expect.objectContaining({
+        orderId,
+      }),
+      'kitchen-service'
+    );
   });
 
   test('should be idempotent - processing the same event twice should only publish once', async () => {
@@ -69,15 +72,15 @@ describe('Kitchen Service - IngredientsReserved Event', () => {
 
     // First call
     await ingredientsReservedHandler.handle(event);
-    expect(mockPublisher.published).toHaveLength(1); // OrderCompleted
+    expect(mockEventBus.publish).toHaveBeenCalledTimes(1); // OrderCompleted
     expect(await dbHelper.isEventProcessed(eventId)).toBe(true);
 
-    // Reset published events for second call
-    mockPublisher.published = [];
+    // Reset publish calls for second call
+    mockEventBus.publish.mockClear();
 
     // Second call with same eventId
     await ingredientsReservedHandler.handle(event);
-    expect(mockPublisher.published).toHaveLength(0); // Should not publish again
+    expect(mockEventBus.publish).toHaveBeenCalledTimes(0); // Should not publish again
     expect(await dbHelper.isEventProcessed(eventId)).toBe(true); // Still processed
   });
 });

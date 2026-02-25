@@ -3,15 +3,16 @@ import { type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { startTestDatabase, stopTestDatabase, cleanDatabase } from '../helpers/database';
 import { randomUUID } from 'node:crypto';
 import { TestDatabaseHelper } from '../helpers/test-helpers';
-import { OrderService } from '../../services/OrderService';
+import { IngredientsReservedHandler } from '../../events/handlers';
+import { HandleIngredientsReservedUseCase } from '../../use-cases';
 import { EventRepository, OrderRepository } from '../../repositories';
-import { IngredientsReservedEvent } from '../../services/types';
+import { IngredientsReservedEvent } from '../../use-cases/types';
 
 describe('Order Service - IngredientsReserved Event', () => {
   let pool: Pool;
   let container: StartedPostgreSqlContainer;
   let dbHelper: TestDatabaseHelper;
-  let orderService: OrderService;
+  let handler: IngredientsReservedHandler;
 
   beforeAll(async () => {
     const { pool: testPool, container: testContainer } = await startTestDatabase();
@@ -21,7 +22,8 @@ describe('Order Service - IngredientsReserved Event', () => {
     dbHelper = new TestDatabaseHelper(pool);
     const orderRepo = new OrderRepository(pool);
     const eventRepo = new EventRepository(pool);
-    orderService = new OrderService(orderRepo, eventRepo, null!);
+    const useCase = new HandleIngredientsReservedUseCase(orderRepo, eventRepo);
+    handler = new IngredientsReservedHandler(useCase);
   });
 
   afterAll(async () => {
@@ -42,7 +44,7 @@ describe('Order Service - IngredientsReserved Event', () => {
       orderId,
     };
 
-    await orderService.handleIngredientsReserved(event);
+    await handler.handle(event);
 
     const order = await dbHelper.getOrder(orderId);
     expect(order.status).toBe('COOKING');
@@ -59,10 +61,10 @@ describe('Order Service - IngredientsReserved Event', () => {
       orderId,
     };
 
-    await orderService.handleIngredientsReserved(event);
+    await handler.handle(event);
     const orderAfterFirstHandle = await dbHelper.getOrder(orderId);
 
-    await orderService.handleIngredientsReserved(event);
+    await handler.handle(event);
     const orderAfterSecondHandle = await dbHelper.getOrder(orderId);
 
     expect(orderAfterFirstHandle.status).toBe('COOKING');

@@ -1,7 +1,3 @@
-/**
- * Shared types and interfaces for kitchen service
- */
-
 export interface OrderCreatedEvent {
   eventId: string;
   orderId: string;
@@ -23,6 +19,7 @@ export interface OrderItemsSelectedEvent {
   eventId: string;
   orderId: string;
   items: Array<{
+    id: string;
     recipeId: string;
     quantity: number;
   }>;

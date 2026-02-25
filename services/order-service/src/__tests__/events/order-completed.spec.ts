@@ -2,16 +2,17 @@ import { Pool } from 'pg';
 import { type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { startTestDatabase, stopTestDatabase, cleanDatabase } from '../helpers/database';
 import { randomUUID } from 'node:crypto';
-import { OrderService } from '../../services/OrderService';
+import { OrderCompletedHandler } from '../../events/handlers';
+import { HandleOrderCompletedUseCase } from '../../use-cases';
 import { TestDatabaseHelper } from '../helpers/test-helpers';
 import { EventRepository, OrderRepository } from '../../repositories';
-import { OrderCompletedEvent } from '../../services/types';
+import { OrderCompletedEvent } from '../../use-cases/types';
 
 describe('Order Service - OrderCompleted Event', () => {
   let pool: Pool;
   let container: StartedPostgreSqlContainer;
   let dbHelper: TestDatabaseHelper;
-  let orderService: OrderService;
+  let handler: OrderCompletedHandler;
 
   beforeAll(async () => {
     const { pool: testPool, container: testContainer } = await startTestDatabase();
@@ -21,7 +22,8 @@ describe('Order Service - OrderCompleted Event', () => {
     dbHelper = new TestDatabaseHelper(pool);
     const orderRepo = new OrderRepository(pool);
     const eventRepo = new EventRepository(pool);
-    orderService = new OrderService(orderRepo, eventRepo, null!);
+    const useCase = new HandleOrderCompletedUseCase(orderRepo, eventRepo);
+    handler = new OrderCompletedHandler(useCase);
   });
 
   afterAll(async () => {
@@ -42,7 +44,7 @@ describe('Order Service - OrderCompleted Event', () => {
       orderId
     };
 
-    await orderService.handleOrderCompleted(event);
+    await handler.handle(event);
 
     const order = await dbHelper.getOrder(orderId);
     expect(order.status).toBe('COMPLETED');
@@ -59,10 +61,10 @@ describe('Order Service - OrderCompleted Event', () => {
       orderId,
     };
 
-    await orderService.handleOrderCompleted(event);
+    await handler.handle(event);
     const orderAfterFirstHandle = await dbHelper.getOrder(orderId);
 
-    await orderService.handleOrderCompleted(event);
+    await handler.handle(event);
     const orderAfterSecondHandle = await dbHelper.getOrder(orderId);
 
     expect(orderAfterFirstHandle.status).toBe('COMPLETED');

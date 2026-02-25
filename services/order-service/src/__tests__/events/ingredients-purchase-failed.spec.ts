@@ -2,16 +2,17 @@ import { Pool } from 'pg';
 import { type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { startTestDatabase, stopTestDatabase, cleanDatabase } from '../helpers/database';
 import { TestDatabaseHelper } from '../helpers/test-helpers';
-import { OrderService } from '../../services/OrderService';
+import { IngredientsPurchaseFailedHandler } from '../../events/handlers';
+import { HandleIngredientsPurchaseFailedUseCase } from '../../use-cases';
 import { OrderRepository, EventRepository } from '../../repositories';
 import { randomUUID } from 'node:crypto';
-import { IngredientsPurchaseFailedEvent } from '../../services/types';
+import { IngredientsPurchaseFailedEvent } from '../../use-cases/types';
 
 describe('Order Service - IngredientsPurchaseFailed Event', () => {
   let pool: Pool;
   let container: StartedPostgreSqlContainer;
   let dbHelper: TestDatabaseHelper;
-  let orderService: OrderService;
+  let handler: IngredientsPurchaseFailedHandler;
 
   beforeAll(async () => {
     const { pool: testPool, container: testContainer } = await startTestDatabase();
@@ -21,7 +22,8 @@ describe('Order Service - IngredientsPurchaseFailed Event', () => {
 
     const orderRepo = new OrderRepository(pool);
     const eventRepo = new EventRepository(pool);
-    orderService = new OrderService(orderRepo, eventRepo, null!); 
+    const useCase = new HandleIngredientsPurchaseFailedUseCase(orderRepo, eventRepo);
+    handler = new IngredientsPurchaseFailedHandler(useCase);
   });
 
   afterAll(async () => {
@@ -39,11 +41,10 @@ describe('Order Service - IngredientsPurchaseFailed Event', () => {
     const eventId = randomUUID();
     const event: IngredientsPurchaseFailedEvent = {
       eventId,
-      orderId,
-      reason: 'Insufficient stock'
+      orderId
     };
 
-    await orderService.handleIngredientsPurchaseFailed(event);
+    await handler.handle(event);
 
     const order = await dbHelper.getOrder(orderId);
     expect(order.status).toBe('FAILED');
@@ -57,14 +58,13 @@ describe('Order Service - IngredientsPurchaseFailed Event', () => {
     const eventId = randomUUID();
     const event: IngredientsPurchaseFailedEvent = {
       eventId,
-      orderId,
-      reason: 'Insufficient stock'
+      orderId
     };
 
-    await orderService.handleIngredientsPurchaseFailed(event);
+    await handler.handle(event);
     const orderAfterFirstHandle = await dbHelper.getOrder(orderId);
 
-    await orderService.handleIngredientsPurchaseFailed(event);
+    await handler.handle(event);
     const orderAfterSecondHandle = await dbHelper.getOrder(orderId);
 
     expect(orderAfterFirstHandle.status).toBe('FAILED');

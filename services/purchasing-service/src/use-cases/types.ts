@@ -1,4 +1,6 @@
-// Event Types
+/**
+ * Shared types and interfaces for purchasing service use cases
+ */
 
 export interface PurchaseRequestedEvent {
   eventId: string;
@@ -19,10 +21,4 @@ export interface PurchaseFailedEvent {
   orderId: string;
   ingredientId: string;
   quantityPurchased: number;
-}
-
-// Provider Response
-export interface ProviderPurchaseResponse {
-  ingredientId: string;
-  quantitySold: number;
 }

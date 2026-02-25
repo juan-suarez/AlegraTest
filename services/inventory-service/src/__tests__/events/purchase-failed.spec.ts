@@ -2,18 +2,19 @@ import { Pool } from 'pg';
 import { type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { startTestDatabase, stopTestDatabase, cleanDatabase } from '../helpers/database';
 import { TestDatabaseHelper } from '../helpers/test-helpers';
-import { InventoryService, EventPublisher } from '../../services/InventoryService';
+import { HandlePurchaseFailedUseCase } from '../../use-cases';
 import { EventRepository, IngredientRepository, ReservationRepository } from '../../repositories';
 import { PurchaseFailedHandler } from '../../events/handlers';
 import { randomUUID } from 'node:crypto';
+import { createMockEventBus } from '../helpers/eventbus';
 
 describe('Inventory Service - PurchaseFailed Event', () => {
   let pool: Pool;
   let container: StartedPostgreSqlContainer;
   let dbHelper: TestDatabaseHelper;
-  let inventoryService: InventoryService;
+  let handlePurchaseFailedUseCase: HandlePurchaseFailedUseCase;
   let purchaseFailedHandler: PurchaseFailedHandler;
-  let mockPublisher: { published: Array<any>; publish: (type: string, event: any) => Promise<void> };
+  let mockEventBus: any;
 
   beforeAll(async () => {
     const { pool: testPool, container: testContainer } = await startTestDatabase();
@@ -33,22 +34,17 @@ describe('Inventory Service - PurchaseFailed Event', () => {
     const ingredientRepo = new IngredientRepository(pool);
     const reservationRepo = new ReservationRepository(pool);
 
-    mockPublisher = {
-      published: [],
-      async publish(type: string, event: any) {
-        this.published.push({ type, event });
-      }
-    };
+    mockEventBus = createMockEventBus();
 
-    inventoryService = new InventoryService(
+    handlePurchaseFailedUseCase = new HandlePurchaseFailedUseCase(
       pool,
       eventRepo,
       ingredientRepo,
       reservationRepo,
-      mockPublisher as any
+      mockEventBus
     );
 
-    purchaseFailedHandler = new PurchaseFailedHandler(inventoryService);
+    purchaseFailedHandler = new PurchaseFailedHandler(handlePurchaseFailedUseCase);
   });
 
   test('should release all reservations and return stock when purchase fails', async () => {
@@ -83,9 +79,9 @@ describe('Inventory Service - PurchaseFailed Event', () => {
     expect(onion.stock).toBe(6);   // 3 + 3 (returned)
 
     // Should publish IngredientsPurchaseFailed
-    expect(mockPublisher.published).toHaveLength(1);
-    expect(mockPublisher.published[0].type).toBe('IngredientsPurchaseFailed');
-    expect(mockPublisher.published[0].event.orderId).toBe(orderId);
+    expect(mockEventBus.published).toHaveLength(1);
+    expect(mockEventBus.published[0].type).toBe('IngredientsPurchaseFailed');
+    expect(mockEventBus.published[0].event.orderId).toBe(orderId);
   });
 
   test('should add partial purchased quantity to stock when purchase fails', async () => {
@@ -171,7 +167,7 @@ describe('Inventory Service - PurchaseFailed Event', () => {
 
     await purchaseFailedHandler.handle(event);
     const stockAfterFirst = (await dbHelper.getIngredient(ingredientId)).stock;
-    const publishedAfterFirst = mockPublisher.published.length;
+    const publishedAfterFirst = mockEventBus.published.length;
 
     // Handle same event again
     await purchaseFailedHandler.handle(event);
@@ -179,7 +175,7 @@ describe('Inventory Service - PurchaseFailed Event', () => {
 
     // Nothing should change
     expect(stockAfterSecond).toBe(stockAfterFirst);
-    expect(mockPublisher.published.length).toBe(publishedAfterFirst);
+    expect(mockEventBus.published.length).toBe(publishedAfterFirst);
   });
 
   test('should handle zero quantity purchased on failure', async () => {
@@ -204,8 +200,8 @@ describe('Inventory Service - PurchaseFailed Event', () => {
     expect(ingredient.stock).toBe(0);
 
     // Should still publish failure event
-    expect(mockPublisher.published).toHaveLength(1);
-    expect(mockPublisher.published[0].type).toBe('IngredientsPurchaseFailed');
+    expect(mockEventBus.published).toHaveLength(1);
+    expect(mockEventBus.published[0].type).toBe('IngredientsPurchaseFailed');
   });
 
   test('should not release already RELEASED reservations twice', async () => {
@@ -231,7 +227,7 @@ describe('Inventory Service - PurchaseFailed Event', () => {
     expect(ingredient.stock).toBe(10); // No change
 
     // Should still publish failure
-    expect(mockPublisher.published).toHaveLength(1);
+    expect(mockEventBus.published).toHaveLength(1);
   });
 
   test('should only expose eventId and orderId in published event', async () => {
@@ -251,7 +247,7 @@ describe('Inventory Service - PurchaseFailed Event', () => {
 
     await purchaseFailedHandler.handle(event);
 
-    const publishedEvent = mockPublisher.published[0];
+    const publishedEvent = mockEventBus.published[0];
     expect(publishedEvent.type).toBe('IngredientsPurchaseFailed');
     expect(publishedEvent.event).toEqual({
       eventId: expect.any(String),
@@ -324,9 +320,9 @@ describe('Inventory Service - PurchaseFailed Event', () => {
     expect(reservation.status).toBe('RELEASED');
 
     // Should publish IngredientsPurchaseFailed with minimal info
-    expect(mockPublisher.published).toHaveLength(1);
-    expect(mockPublisher.published[0].type).toBe('IngredientsPurchaseFailed');
-    expect(mockPublisher.published[0].event.orderId).toBe(orderId);
+    expect(mockEventBus.published).toHaveLength(1);
+    expect(mockEventBus.published[0].type).toBe('IngredientsPurchaseFailed');
+    expect(mockEventBus.published[0].event.orderId).toBe(orderId);
   });
 
   test('should only publish IngredientsPurchaseFailed once per order, on first failure', async () => {
@@ -352,9 +348,9 @@ describe('Inventory Service - PurchaseFailed Event', () => {
     await purchaseFailedHandler.handle(event1);
 
     // Should publish the event
-    expect(mockPublisher.published).toHaveLength(1);
-    expect(mockPublisher.published[0].type).toBe('IngredientsPurchaseFailed');
-    expect(mockPublisher.published[0].event.orderId).toBe(orderId);
+    expect(mockEventBus.published).toHaveLength(1);
+    expect(mockEventBus.published[0].type).toBe('IngredientsPurchaseFailed');
+    expect(mockEventBus.published[0].event.orderId).toBe(orderId);
 
     // Stock should have partial purchase + ALL reserved amounts (all reservations released)
     let tomato = await dbHelper.getIngredient(ingredientId1);
@@ -374,7 +370,7 @@ describe('Inventory Service - PurchaseFailed Event', () => {
     await purchaseFailedHandler.handle(event2);
 
     // Should NOT publish the event again (still 1 published)
-    expect(mockPublisher.published).toHaveLength(1);
+    expect(mockEventBus.published).toHaveLength(1);
 
     // Stock should only add the partial purchase (reservations already released)
     onion = await dbHelper.getIngredient(ingredientId2);
@@ -391,7 +387,7 @@ describe('Inventory Service - PurchaseFailed Event', () => {
     await purchaseFailedHandler.handle(event3);
 
     // Still should NOT publish
-    expect(mockPublisher.published).toHaveLength(1);
+    expect(mockEventBus.published).toHaveLength(1);
 
     // Stock should be updated with new partial purchase
     tomato = await dbHelper.getIngredient(ingredientId1);

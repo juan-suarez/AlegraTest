@@ -1,30 +1,25 @@
 import { EventRepository } from '../repositories';
-import { ProviderClient } from './ProviderClient';
+import { ProviderClient } from '../externals';
+import { EventBusLocal } from '../infrastructure/messaging';
 import {
   PurchaseRequestedEvent,
   PurchaseCompletedEvent,
   PurchaseFailedEvent,
 } from './types';
+import { UseCase } from './UseCase';
 import { randomUUID } from 'node:crypto';
 
-export class EventPublisher {
-  async publish(type: string, event: any): Promise<void> {
-    // TODO: Implement actual publishing
-    console.log(`Publishing ${type}:`, event);
-  }
-}
-
-export class PurchasingService {
+export class HandlePurchaseRequestedUseCase implements UseCase<PurchaseRequestedEvent> {
   private readonly MAX_RETRIES = 3;
   private readonly BASE_DELAY_MS = 200;
 
   constructor(
     private eventRepo: EventRepository,
     private providerClient: ProviderClient,
-    private eventPublisher: EventPublisher
+    private eventBus: EventBusLocal
   ) {}
 
-  async handlePurchaseRequested(event: PurchaseRequestedEvent): Promise<void> {
+  async execute(event: PurchaseRequestedEvent): Promise<void> {
     if (await this.eventRepo.isEventProcessed(event.eventId)) {
       return;
     }
@@ -50,7 +45,7 @@ export class PurchasingService {
         ingredientId: event.ingredientId,
         quantityPurchased: accumulatedQuantity,
       };
-      await this.eventPublisher.publish('PurchaseCompleted', completedEvent);
+      await this.eventBus.publish('inventory-events', 'PurchaseCompleted', completedEvent, 'purchasing-service');
     } else {
       const failedEvent: PurchaseFailedEvent = {
         eventId: randomUUID(),
@@ -58,7 +53,7 @@ export class PurchasingService {
         ingredientId: event.ingredientId,
         quantityPurchased: accumulatedQuantity,
       };
-      await this.eventPublisher.publish('PurchaseFailed', failedEvent);
+      await this.eventBus.publish('inventory-events', 'PurchaseFailed', failedEvent, 'purchasing-service');
     }
 
     // Mark event as processed

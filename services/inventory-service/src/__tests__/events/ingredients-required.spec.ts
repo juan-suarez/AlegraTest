@@ -2,18 +2,19 @@ import { Pool } from 'pg';
 import { type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { startTestDatabase, stopTestDatabase, cleanDatabase } from '../helpers/database';
 import { TestDatabaseHelper } from '../helpers/test-helpers';
-import { InventoryService, EventPublisher } from '../../services/InventoryService';
+import { HandleIngredientsRequiredUseCase } from '../../use-cases';
 import { EventRepository, IngredientRepository, ReservationRepository } from '../../repositories';
 import { IngredientsRequiredHandler } from '../../events/handlers';
 import { randomUUID } from 'node:crypto';
+import { createMockEventBus } from '../helpers/eventbus';
 
 describe('Inventory Service - IngredientsRequired Event', () => {
   let pool: Pool;
   let container: StartedPostgreSqlContainer;
   let dbHelper: TestDatabaseHelper;
-  let inventoryService: InventoryService;
+  let handleIngredientsRequiredUseCase: HandleIngredientsRequiredUseCase;
   let ingredientsRequiredHandler: IngredientsRequiredHandler;
-  let mockPublisher: { published: Array<any>; publish: (type: string, event: any) => Promise<void> };
+  let mockEventBus: any;
 
   beforeAll(async () => {
     const { pool: testPool, container: testContainer } = await startTestDatabase();
@@ -33,22 +34,17 @@ describe('Inventory Service - IngredientsRequired Event', () => {
     const ingredientRepo = new IngredientRepository(pool);
     const reservationRepo = new ReservationRepository(pool);
 
-    mockPublisher = {
-      published: [],
-      async publish(type: string, event: any) {
-        this.published.push({ type, event });
-      }
-    };
+    mockEventBus = createMockEventBus();
 
-    inventoryService = new InventoryService(
+    handleIngredientsRequiredUseCase = new HandleIngredientsRequiredUseCase(
       pool,
       eventRepo,
       ingredientRepo,
       reservationRepo,
-      mockPublisher as any
+      mockEventBus
     );
 
-    ingredientsRequiredHandler = new IngredientsRequiredHandler(inventoryService);
+    ingredientsRequiredHandler = new IngredientsRequiredHandler(handleIngredientsRequiredUseCase);
   });
 
   test('should reserve ingredients when stock is sufficient', async () => {
@@ -82,9 +78,9 @@ describe('Inventory Service - IngredientsRequired Event', () => {
     expect(reservations).toHaveLength(2);
     expect(reservations.every(r => r.status === 'RESERVED')).toBe(true);
 
-    expect(mockPublisher.published).toHaveLength(1);
-    expect(mockPublisher.published[0].type).toBe('IngredientsReserved');
-    expect(mockPublisher.published[0].event.orderId).toBe(orderId);
+    expect(mockEventBus.published).toHaveLength(1);
+    expect(mockEventBus.published[0].type).toBe('IngredientsReserved');
+    expect(mockEventBus.published[0].event.orderId).toBe(orderId);
   });
 
   test('should create PURCHASE_PENDING reservation when stock is insufficient', async () => {
@@ -113,11 +109,11 @@ describe('Inventory Service - IngredientsRequired Event', () => {
     expect(reservation.quantity_needed).toBe(10);
     expect(reservation.quantity_reserved).toBe(3);
 
-    expect(mockPublisher.published).toHaveLength(1);
-    expect(mockPublisher.published[0].type).toBe('PurchaseRequested');
-    expect(mockPublisher.published[0].event.orderId).toBe(orderId);
-    expect(mockPublisher.published[0].event.ingredientId).toBe(tomatoId);
-    expect(mockPublisher.published[0].event.quantityRequired).toBe(7);
+    expect(mockEventBus.published).toHaveLength(1);
+    expect(mockEventBus.published[0].type).toBe('PurchaseRequested');
+    expect(mockEventBus.published[0].event.orderId).toBe(orderId);
+    expect(mockEventBus.published[0].event.ingredientId).toBe(tomatoId);
+    expect(mockEventBus.published[0].event.quantityRequired).toBe(7);
   });
 
   test('should handle mixed scenario: some reserved, some need purchase', async () => {
@@ -149,8 +145,8 @@ describe('Inventory Service - IngredientsRequired Event', () => {
     expect(tomatoReservation?.status).toBe('RESERVED');
     expect(onionReservation?.status).toBe('PURCHASE_PENDING');
 
-    expect(mockPublisher.published).toHaveLength(1);
-    expect(mockPublisher.published[0].type).toBe('PurchaseRequested');
+    expect(mockEventBus.published).toHaveLength(1);
+    expect(mockEventBus.published[0].type).toBe('PurchaseRequested');
   });
 
   test('should be idempotent for duplicate IngredientsRequired events', async () => {
@@ -205,8 +201,8 @@ describe('Inventory Service - IngredientsRequired Event', () => {
     expect(reservation.quantity_reserved).toBe(0);
     expect(reservation.quantity_needed).toBe(5);
 
-    expect(mockPublisher.published).toHaveLength(1);
-    expect(mockPublisher.published[0].event.quantityRequired).toBe(5);
+    expect(mockEventBus.published).toHaveLength(1);
+    expect(mockEventBus.published[0].event.quantityRequired).toBe(5);
   });
 
   test('should handle multiple ingredients all with sufficient stock', async () => {
@@ -236,8 +232,8 @@ describe('Inventory Service - IngredientsRequired Event', () => {
     expect(reservations).toHaveLength(3);
     expect(reservations.every(r => r.status === 'RESERVED')).toBe(true);
 
-    expect(mockPublisher.published).toHaveLength(1);
-    expect(mockPublisher.published[0].type).toBe('IngredientsReserved');
+    expect(mockEventBus.published).toHaveLength(1);
+    expect(mockEventBus.published[0].type).toBe('IngredientsReserved');
   });
 
   test('should throw error when ingredient does not exist', async () => {
