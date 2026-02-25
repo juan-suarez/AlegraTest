@@ -1,28 +1,17 @@
-// Event Types
+/**
+ * @deprecated Tipos movidos a ubicaciones específicas.
+ *
+ * Usar en su lugar:
+ * - Event types: src/use-cases/types.ts
+ * - ProviderPurchaseResponse: src/externals/types.ts
+ *
+ * Este archivo se mantiene solo para compatibilidad hacia atrás.
+ */
 
-export interface PurchaseRequestedEvent {
-  eventId: string;
-  orderId: string;
-  ingredientId: string;
-  quantityRequired: number;
-}
+export type { 
+  PurchaseRequestedEvent,
+  PurchaseCompletedEvent,
+  PurchaseFailedEvent,
+} from '../use-cases/types';
 
-export interface PurchaseCompletedEvent {
-  eventId: string;
-  orderId: string;
-  ingredientId: string;
-  quantityPurchased: number;
-}
-
-export interface PurchaseFailedEvent {
-  eventId: string;
-  orderId: string;
-  ingredientId: string;
-  quantityPurchased: number;
-}
-
-// Provider Response
-export interface ProviderPurchaseResponse {
-  ingredientId: string;
-  quantitySold: number;
-}
+export type { ProviderPurchaseResponse } from '../externals/types';
