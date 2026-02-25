@@ -1,0 +1,28 @@
+{
+  "name": "restaurant-event-driven",
+  "version": "1.0.0",
+  "description": "Event-driven restaurant system with order, kitchen, inventory and purchasing services",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "dev": "docker-compose up",
+    "dev:services": "docker-compose up order-service kitchen-service inventory-service purchasing-service",
+    "dev:test": "npm run dev & sleep 60 && npm run test:e2e",
+    "test:e2e": "npx ts-node -P ./infraestructure/e2e-tests/tsconfig.json ./infraestructure/e2e-tests/test-e2e.ts",
+    "build": "docker-compose build",
+    "down": "docker-compose down",
+    "down:v": "docker-compose down -v",
+    "logs": "docker-compose logs -f",
+    "ps": "docker-compose ps"
+  },
+  "dependencies": {
+    "@aws-sdk/client-sns": "^3.651.1",
+    "pg": "^8.11.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.6",
+    "@types/pg": "^8.11.3",
+    "typescript": "^5.3.3",
+    "ts-node": "^10.9.2"
+  }
+}

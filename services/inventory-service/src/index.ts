@@ -54,10 +54,13 @@ async function main() {
 
     // Conectar handler
     const handler = eventRouter.getHandler();
-    await eventBus.startConsuming(handler);
+    eventBus.startConsuming(handler).catch((error) => {
+      console.error("❌ Error en consumer:", error);
+      process.exit(1);
+    });
     console.log('✅ EventBus escuchando eventos...');
 
-    console.log('\n✨ inventory-service listo');
+    console.log('\n✨ inventory-service está listo para recibir eventos');
   } catch (error) {
     console.error('❌ Error al inicializar:', error);
     process.exit(1);

@@ -1,53 +1,293 @@
-# infrastructure
+# 🍽️ Restaurant Event-Driven System - Infraestructure
 
-Este directorio contiene toda la definición de infraestructura como código (IaC) usando **AWS CDK**.
+## Descripción
 
-La arquitectura está diseñada para funcionar completamente en la **capa gratuita de AWS (Free Tier)**.
+Este directorio contiene toda la infraestructura para el sistema de restaurante event-driven:
 
----
-
-# 1. Principios de Infraestructura
-
-- Infraestructura 100% declarativa con AWS CDK
-- Arquitectura serverless
-- Comunicación asíncrona basada en eventos
-- Desacoplamiento total entre servicios
-- Uso responsable de recursos para mantenerse dentro del Free Tier
-- Seguridad basada en IAM Roles por servicio
+- **postgres/**: Scripts de inicialización de base de datos
+- **localstack/**: Scripts para configurar SNS/SQS en LocalStack
+- **e2e-tests/**: Tests end-to-end automatizados
+- **scripts/**: Utilidades para levantar servicios
 
 ---
 
-# 2. Servicios Cloud Utilizados
+## 📋 Rápido Inicio
 
-## 2.1 AWS Lambda
+### **Opción 1: Ejecutar TODO con Docker Compose**
 
-Cada microservicio se despliega como:
+```bash
+# Levantar infraestructura + servicios + E2E test
+npm run dev:test
 
-- Una Lambda containerizada (imagen Docker)
-- Independiente
-- Con su propio rol IAM
-- Conectada a su respectiva base de datos
+# Solo levantar infraestructura + servicios (sin test)
+npm run dev:services
+```
 
-Free Tier incluye:
-- 1 millón de invocaciones por mes
-- 400.000 GB-segundos
+### **Opción 2: Levantar solo infraestructura y servicios manualmente**
 
-Esto es más que suficiente para una prueba técnica o proyecto de portafolio.
+```bash
+# Levantar PostgreSQL y LocalStack
+docker-compose up postgres localstack
+
+# En otra terminal, levantar los servicios
+npm run dev:services
+
+# O uno por uno
+cd services/order-service && npm start
+cd services/kitchen-service && npm start
+cd services/inventory-service && npm start
+cd services/purchasing-service && npm start
+```
+
+### **Opción 3: Ejecutar E2E test después de levantar servicios**
+
+```bash
+# Asumiendo que ya tienes servicios corriendo
+npm run test:e2e
+```
 
 ---
 
-## 2.2 Amazon SNS
+## 🔍 Verificar Estado
 
-Se utiliza como **Event Bus** central.
+```bash
+# Ver estado de containers
+docker-compose ps
 
-Responsabilidades:
-- Recibir eventos publicados por los servicios
-- Distribuirlos a múltiples suscriptores (SQS)
+# Ver logs en tiempo real
+docker-compose logs -f
 
-Ventajas:
-- Pub/Sub nativo
-- Totalmente desacoplado
-- Integración directa con SQS y Lambda
+# Ver logs de un servicio específico
+docker-compose logs -f order-service
+docker-compose logs -f kitchen-service
+docker-compose logs -f inventory-service
+docker-compose logs -f purchasing-service
+docker-compose logs -f e2e-tester
+
+# Detener todo
+docker-compose down
+
+# Detener y eliminar volúmenes
+docker-compose down -v
+```
+
+---
+
+## 📊 Estructura del E2E Test
+
+El test E2E (`e2e-tests/test-e2e.ts`) ejecuta el siguiente flujo:
+
+```
+1. Verificar conexiones a todas las BDs
+2. Limpiar eventos previos
+3. Crear una orden (OrderCreated event)
+4. Esperar 15s para propagación de eventos
+5. Verificar eventos en todas las BDs
+6. Verificar estado final de la orden
+7. Reportar resultados
+```
+
+**Flujo de eventos esperado:**
+```
+Order Service:    OrderCreated
+                      ↓
+Kitchen Service:  OrderCreated → OrderItemsSelected + IngredientsRequired
+                                      ↓
+Inventory Service: IngredientsRequired → PurchaseRequested + IngredientsReserved
+                                           ↓
+Purchasing Service: PurchaseRequested → PurchaseCompleted
+                                           ↓
+Inventory Service: PurchaseCompleted → Update Stock
+```
+
+---
+
+## 🐳 Docker Compose Profiles
+
+El `docker-compose.yml` usa profiles para ejecutar diferentes escenarios:
+
+```bash
+# Levanta: postgres, localstack, 4 servicios (sin E2E test)
+docker-compose up
+
+# Levanta: postgres, localstack, 4 servicios, E2E test
+docker-compose up --profile e2e
+
+# Solo levanta un servicio específico
+docker-compose up order-service
+
+# Levanta solo infraestructura
+docker-compose up postgres localstack
+```
+
+---
+
+## 🔐 Variables de Entorno
+
+Se configuran automáticamente en `docker-compose.yml`:
+
+```env
+# Database
+DATABASE_URL=postgresql://postgres:postgres@postgres:5432/{service}_db
+
+# AWS/LocalStack
+AWS_REGION=us-east-1
+AWS_ENDPOINT=http://localstack:4566
+AWS_ACCESS_KEY_ID=test
+AWS_SECRET_ACCESS_KEY=test
+
+# SQS
+SQS_QUEUE_URL=https://sqs.us-east-1.amazonaws.com/000000000000/{service}-service-queue
+
+# Polling
+POLLING_INTERVAL_MS=1000
+```
+
+---
+
+## 🛠️ Scripts Disponibles
+
+### `scripts/start-services.sh`
+Levanta todos los servicios en paralelo con npm install automático.
+
+```bash
+bash infraestructure/scripts/start-services.sh
+```
+
+### `scripts/wait-for-services.sh`
+Espera a que los servicios estén listos (health checks).
+
+```bash
+bash infraestructure/scripts/wait-for-services.sh
+```
+
+---
+
+## 📝 Logs y Debugging
+
+### Ver logs de E2E test
+```bash
+docker-compose logs e2e-tester
+```
+
+### Ver eventos en base de datos
+```bash
+docker exec restaurant-postgres psql -U postgres
+
+# En psql:
+SELECT * FROM order_db.events ORDER BY created_at DESC;
+SELECT * FROM kitchen_db.events ORDER BY created_at DESC;
+SELECT * FROM inventory_db.events ORDER BY created_at DESC;
+SELECT * FROM purchasing_db.events ORDER BY created_at DESC;
+```
+
+### Ver tópicos SNS y colas SQS
+```bash
+# SNS Topics
+docker exec restaurant-localstack awslocal sns list-topics
+
+# SQS Queues
+docker exec restaurant-localstack awslocal sqs list-queues
+
+# Subscriptions
+docker exec restaurant-localstack awslocal sns list-subscriptions
+```
+
+---
+
+## 🐛 Troubleshooting
+
+### **Problema: "port 5432 already in use"**
+```bash
+# Matar proceso en puerto 5432
+lsof -ti:5432 | xargs kill -9
+
+# O usar puerto diferente
+docker-compose up -p "5433:5432"
+```
+
+### **Problema: "LocalStack no inicializa topics"**
+```bash
+# Revisar logs
+docker logs restaurant-localstack
+
+# Reiniciar
+docker-compose restart localstack
+```
+
+### **Problema: "Bases de datos no se crean"**
+```bash
+# Revisar script de inicialización
+cat infraestructure/postgres/init-databases.sh
+
+# Ejecutar manualmente si es necesario
+docker exec restaurant-postgres bash /docker-entrypoint-initdb.d/init-databases.sh
+```
+
+### **Problema: "Servicios no se comunican"**
+```bash
+# Verificar red
+docker network ls
+docker network inspect restaurant-network
+
+# Test conectividad entre containers
+docker exec restaurant-order-service ping -c 1 restaurant-kitchen-service
+```
+
+---
+
+## 📦 Estructura de Archivos
+
+```
+infraestructure/
+├── postgres/
+│   ├── init-databases.sh      # Script de inicialización de BDs
+│   ├── verify-databases.sh    # Script de verificación
+│   └── README.md
+├── localstack/
+│   ├── init-aws.sh            # Script para crear topics/queues
+│   ├── verify.sh              # Script de verificación
+│   └── README.md
+├── e2e-tests/
+│   ├── test-e2e.ts            # Test E2E principal
+│   ├── Dockerfile             # Imagen Docker para E2E
+│   └── README.md
+├── scripts/
+│   ├── start-services.sh      # Levanta todos los servicios
+│   ├── wait-for-services.sh   # Espera a que servicios estén listos
+│   └── README.md
+└── README.md                  # Este archivo
+```
+
+---
+
+## 🚀 Próximos Pasos
+
+1. **Crear API Controller** en order-service para recibir órdenes HTTP
+2. **Implementar API Gateway** (API Gateway o Kong)
+3. **Agregar autenticación** (JWT, OAuth2)
+4. **Implementar circuit breakers** y retry logic mejorados
+5. **Agregar observabilidad** (Prometheus, Grafana, ELK)
+6. **Tests unitarios** en cada servicio
+7. **Tests de integración** entre servicios
+
+---
+
+## 📚 Documentación Relacionada
+
+- [README.md]('../README.md') - Descripción general del proyecto
+- [PASO1_LOCALSTACK.md]('../PASO1_LOCALSTACK.md') - Setup LocalStack
+- [PASO2_EVENTBUS.md]('../PASO2_EVENTBUS.md') - Setup EventBus
+
+---
+
+## 📞 Soporte
+
+Si encuentras problemas:
+1. Revisa los logs: `docker-compose logs`
+2. Verifica health checks: `docker-compose ps`
+3. Ejecuta scripts de verificación en cada carpeta
+4. Limpia y reinicia: `docker-compose down -v && docker-compose up`
 - Incluido en Free Tier con alto margen
 
 ---

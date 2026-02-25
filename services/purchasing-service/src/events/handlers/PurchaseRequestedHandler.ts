@@ -13,6 +13,7 @@ export class PurchaseRequestedHandler {
         eventId: event.eventId,
         orderId: event.orderId,
         ingredientId: event.ingredientId,
+        ingredientName: event.ingredientName,
         quantityRequired: event.quantityRequired,
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
@@ -36,6 +37,10 @@ export class PurchaseRequestedHandler {
 
     if (!event.ingredientId || typeof event.ingredientId !== 'string') {
       throw new Error('Event must have a valid ingredientId string');
+    }
+
+    if (!event.ingredientName || typeof event.ingredientName !== 'string') {
+      throw new Error('Event must have a valid ingredientName string');
     }
 
     if (typeof event.quantityRequired !== 'number' || event.quantityRequired <= 0) {

@@ -25,6 +25,21 @@ CREATE TABLE IF NOT EXISTS ingredients (
 
 CREATE INDEX IF NOT EXISTS idx_ingredients_name ON ingredients(name);
 
+-- Seed basic ingredients used by kitchen recipes
+INSERT INTO ingredients (name, stock)
+VALUES
+    ('meat', 5),
+    ('cheese', 5),
+    ('tomato', 5),
+    ('lettuce', 5),
+    ('onion', 5),
+    ('ketchup', 5),
+    ('chicken', 5),
+    ('rice', 5),
+    ('lemon', 5),
+    ('potato', 5)
+ON CONFLICT (name) DO NOTHING;
+
 -- Tipo enum para estado de reservas
 DO $$ BEGIN
     CREATE TYPE reservation_status AS ENUM ('RESERVED', 'PURCHASE_PENDING', 'RELEASED');

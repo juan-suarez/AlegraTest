@@ -32,7 +32,6 @@ export class EventBusLocal {
 
   /**
    * Publica un evento a un topic SNS
-   * Estructura de logs: eventId, source, eventType, data
    */
   async publish(topicName: string, eventType: string, data: any, source: string): Promise<void> {
     const envelope: EventEnvelope = {
@@ -52,20 +51,15 @@ export class EventBusLocal {
 
     try {
       await this.snsClient.send(command);
-      console.log(`📤 Published event`, {
+      console.log(`📤 Published ${eventType} to ${topicName}`, {
         eventId: envelope.eventId,
-        eventType,
-        topicName,
         source,
       });
     } catch (error) {
-      console.error(`❌ Error publishing event`, {
-        eventId: envelope.eventId,
+      console.error(`❌ Error publishing event to ${topicName}`, {
         eventType,
-        topicName,
         source,
         error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
       });
       throw error;
     }
@@ -124,7 +118,9 @@ export class EventBusLocal {
     const command = new ReceiveMessageCommand({
       QueueUrl: this.config.queueUrl,
       MaxNumberOfMessages: 10,
-      WaitTimeSeconds: 1,
+      WaitTimeSeconds: 20, // Long polling
+      AttributeNames: ['All'],
+      MessageAttributeNames: ['All'],
     });
 
     const response = await this.sqsClient.send(command);
@@ -132,58 +128,63 @@ export class EventBusLocal {
   }
 
   /**
-   * Procesa un mensaje recibido
+   * Procesa un mensaje individual
    */
   private async processMessage(message: Message, handler: MessageHandler): Promise<void> {
-    if (!message.Body || !message.ReceiptHandle) {
-      console.warn(`⚠️  Invalid SQS message structure`);
-      return;
-    }
-
     try {
-      const envelope = JSON.parse(message.Body) as EventEnvelope;
-      const attemptNumber = parseInt(message.Attributes?.ApproximateReceiveCount || '1', 10);
+      if (!message.Body) {
+        console.warn('⚠️  Received message without body');
+        return;
+      }
 
-      console.log(`⚙️  Processing message`, {
-        eventId: envelope.eventId,
-        eventType: envelope.eventType,
-        source: envelope.source,
-        attemptNumber,
+      // SNS wraps the message, extract it
+      const snsMessage = JSON.parse(message.Body);
+      const eventEnvelope: EventEnvelope = JSON.parse(snsMessage.Message);
+
+      // Capturar número de intentos
+      const receiveCount = message.Attributes?.ApproximateReceiveCount || '1';
+
+      console.log(`📨 Processing event: ${eventEnvelope.eventType}`, {
+        eventId: eventEnvelope.eventId,
+        source: eventEnvelope.source,
+        attemptNumber: receiveCount,
       });
 
-      await handler(envelope);
+      // Delegar a handler
+      await handler(eventEnvelope);
 
-      // Eliminar mensaje de la queue
-      await this.deleteMessage(message.ReceiptHandle);
-
-      console.log(`✅ Message processed successfully`, {
-        eventId: envelope.eventId,
-        eventType: envelope.eventType,
+      // Eliminar mensaje de la cola
+      await this.deleteMessage(message);
+      
+      console.log(`✅ Successfully processed: ${eventEnvelope.eventType}`, {
+        eventId: eventEnvelope.eventId,
       });
     } catch (error) {
-      const envelope = JSON.parse(message.Body) as EventEnvelope;
-      const attemptNumber = parseInt(message.Attributes?.ApproximateReceiveCount || '1', 10);
-
-      console.error(`❌ Error processing message`, {
-        eventId: envelope.eventId,
-        eventType: envelope.eventType,
-        source: envelope.source,
-        attemptNumber,
+      const receiveCount = message.Attributes?.ApproximateReceiveCount || '1';
+      
+      console.error('❌ Error processing message', {
+        attemptNumber: receiveCount,
+        messageId: message.MessageId,
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
       });
-
-      // No eliminar mensaje para que SQS lo reintente
+      
+      // El mensaje volverá a la cola después del visibility timeout
+      throw error;
     }
   }
 
   /**
-   * Elimina un mensaje de SQS
+   * Elimina un mensaje de la cola
    */
-  private async deleteMessage(receiptHandle: string): Promise<void> {
+  private async deleteMessage(message: Message): Promise<void> {
+    if (!message.ReceiptHandle) {
+      return;
+    }
+
     const command = new DeleteMessageCommand({
       QueueUrl: this.config.queueUrl,
-      ReceiptHandle: receiptHandle,
+      ReceiptHandle: message.ReceiptHandle,
     });
 
     await this.sqsClient.send(command);

@@ -61,10 +61,11 @@ export class HandleIngredientsRequiredUseCase {
             eventId: randomUUID(),
             orderId: event.orderId,
             ingredientId: ingredient.id,
+            ingredientName,
             quantityRequired: quantityNeeded - quantityToReserve,
           };
 
-          await this.eventBus.publish('order-events', 'PurchaseRequested', purchaseEvent, 'inventory-service');
+          await this.eventBus.publish('PurchaseRequested', 'PurchaseRequested', purchaseEvent, 'inventory-service');
         }
       }
 
@@ -74,7 +75,7 @@ export class HandleIngredientsRequiredUseCase {
           orderId: event.orderId,
         };
 
-        await this.eventBus.publish('order-events', 'IngredientsReserved', reservedEvent, 'inventory-service');
+        await this.eventBus.publish('IngredientsReserved', 'IngredientsReserved', reservedEvent, 'inventory-service');
       }
 
       await this.eventRepo.markEventProcessed(event.eventId);

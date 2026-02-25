@@ -1,5 +1,5 @@
 import { Pool, PoolClient } from 'pg';
-import { Reservation, ReservationStatus } from '../services/types';
+import { Reservation, ReservationStatus } from './interfaces';
 
 export class ReservationRepository {
   constructor(private pool: Pool) {}

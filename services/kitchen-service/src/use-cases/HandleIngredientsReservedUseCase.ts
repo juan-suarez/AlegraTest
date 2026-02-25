@@ -20,7 +20,7 @@ export class HandleIngredientsReservedUseCase implements UseCase<IngredientsRese
       orderId: event.orderId
     };
 
-    await this.eventBus.publish('order-events', 'OrderCompleted', completedEvent, 'kitchen-service');
+    await this.eventBus.publish('OrderCompleted', 'OrderCompleted', completedEvent, 'kitchen-service');
 
     await this.eventRepo.markEventProcessed(event.eventId);
   }

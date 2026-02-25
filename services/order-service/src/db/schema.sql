@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS orders (
 CREATE TABLE IF NOT EXISTS order_items (
     id UUID PRIMARY KEY,
     order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-    recipe_id UUID NOT NULL,
+    recipe_id VARCHAR(100) NOT NULL,
     quantity INTEGER NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );

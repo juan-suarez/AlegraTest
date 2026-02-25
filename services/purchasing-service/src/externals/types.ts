@@ -1,4 +1,4 @@
 export interface ProviderPurchaseResponse {
-  ingredientId: string;
+  ingredientName: string;
   quantitySold: number;
 }

@@ -1,6 +1,10 @@
 version: '3.8'
 
 services:
+  # ============================================================
+  # Infrastructure Services
+  # ============================================================
+  
   postgres:
     image: postgres:15
     container_name: restaurant-postgres
@@ -42,8 +46,198 @@ services:
       test: ["CMD", "awslocal", "sns", "list-topics"]
       interval: 5s
       timeout: 10s
-      retries: 10
-      start_period: 10s
+      retries: 15
+      start_period: 20s
+
+  localstack-init:
+    image: localstack/localstack:latest
+    container_name: restaurant-localstack-init
+    depends_on:
+      localstack:
+        condition: service_healthy
+    environment:
+      - SERVICES=sns,sqs
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_ENDPOINT_URL_SNS=http://localstack:4566
+      - AWS_ENDPOINT_URL_SQS=http://localstack:4566
+    volumes:
+      - "./infraestructure/localstack/init-aws.sh:/docker-entrypoint-initaws.d/init-aws.sh"
+    entrypoint: /bin/bash -c "bash /docker-entrypoint-initaws.d/init-aws.sh && sleep 2"
+    networks:
+      - restaurant-network
+
+  # ============================================================
+  # Microservices
+  # ============================================================
+
+  order-service:
+    build:
+      context: ./services/order-service
+      dockerfile: Dockerfile
+    container_name: restaurant-order-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      localstack-init:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: order_service
+      AWS_REGION: us-east-1
+      AWS_ENDPOINT: http://localstack:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      SQS_QUEUE_URL: https://sqs.us-east-1.amazonaws.com/000000000000/order-service-queue
+      SERVICE_PORT: 3001
+      POLLING_INTERVAL_MS: 1000
+    ports:
+      - "3001:3001"
+    networks:
+      - restaurant-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  kitchen-service:
+    build:
+      context: ./services/kitchen-service
+      dockerfile: Dockerfile
+    container_name: restaurant-kitchen-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      localstack-init:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: kitchen_service
+      AWS_REGION: us-east-1
+      AWS_ENDPOINT: http://localstack:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      SQS_QUEUE_URL: https://sqs.us-east-1.amazonaws.com/000000000000/kitchen-service-queue
+      SERVICE_PORT: 3002
+      POLLING_INTERVAL_MS: 1000
+    ports:
+      - "3002:3002"
+    networks:
+      - restaurant-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  inventory-service:
+    build:
+      context: ./services/inventory-service
+      dockerfile: Dockerfile
+    container_name: restaurant-inventory-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      localstack-init:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: inventory_service
+      AWS_REGION: us-east-1
+      AWS_ENDPOINT: http://localstack:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      SQS_QUEUE_URL: https://sqs.us-east-1.amazonaws.com/000000000000/inventory-service-queue
+      SERVICE_PORT: 3003
+      POLLING_INTERVAL_MS: 1000
+    ports:
+      - "3003:3003"
+    networks:
+      - restaurant-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  purchasing-service:
+    build:
+      context: ./services/purchasing-service
+      dockerfile: Dockerfile
+    container_name: restaurant-purchasing-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      localstack-init:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: development
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: purchasing_service
+      AWS_REGION: us-east-1
+      AWS_ENDPOINT: http://localstack:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      SQS_QUEUE_URL: https://sqs.us-east-1.amazonaws.com/000000000000/purchasing-service-queue
+      SERVICE_PORT: 3004
+      POLLING_INTERVAL_MS: 1000
+    ports:
+      - "3004:3004"
+    networks:
+      - restaurant-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3004/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # ============================================================
+  # E2E Test (Descomenta para ejecutar, o usa: npm run dev:test)
+  # ============================================================
+
+  # e2e-tester:
+  #   build:
+  #     context: .
+  #     dockerfile: ./infraestructure/e2e-tests/Dockerfile
+  #   container_name: restaurant-e2e-tester
+  #   depends_on:
+  #     order-service:
+  #       condition: service_healthy
+  #     kitchen-service:
+  #       condition: service_healthy
+  #     inventory-service:
+  #       condition: service_healthy
+  #     purchasing-service:
+  #       condition: service_healthy
+  #   environment:
+  #     ORDER_DB_URL: postgresql://postgres:postgres@postgres:5432/order_service
+  #     KITCHEN_DB_URL: postgresql://postgres:postgres@postgres:5432/kitchen_service
+  #     INVENTORY_DB_URL: postgresql://postgres:postgres@postgres:5432/inventory_service
+  #     PURCHASING_DB_URL: postgresql://postgres:postgres@postgres:5432/purchasing_service
+  #     EVENT_BUS_ENDPOINT: http://localstack:4566
+  #   networks:
+  #     - restaurant-network
 
 volumes:
   postgres_data:
