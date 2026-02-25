@@ -3,9 +3,9 @@ import { ProviderPurchaseResponse } from './types';
 export class ProviderClient {
   private readonly apiUrl = 'https://recruitment.alegra.com/api/farmers-market/buy';
 
-  async purchaseIngredient(ingredientId: string): Promise<ProviderPurchaseResponse> {
+  async purchaseIngredient(ingredientName: string): Promise<ProviderPurchaseResponse> {
     try {
-      const url = `${this.apiUrl}?ingredient=${encodeURIComponent(ingredientId)}`;
+      const url = `${this.apiUrl}?ingredient=${encodeURIComponent(ingredientName)}`;
       const response = await fetch(url, {
         method: 'GET',
         headers: {
@@ -17,16 +17,16 @@ export class ProviderClient {
         throw new Error(`Provider API error: ${response.status} ${response.statusText}`);
       }
 
-      const data = await response.json() as { ingredientId?: string; quantitySold?: number };
+      const data = await response.json() as { ingredient?: string; quantitySold?: number };
       
       return {
-        ingredientId: data.ingredientId || ingredientId,
+        ingredientName: data.ingredient || ingredientName,
         quantitySold: data.quantitySold || 0
       };
     } catch (error) {
-      console.error(`Error purchasing ingredient ${ingredientId}:`, error);
+      console.error(`Error purchasing ingredient ${ingredientName}:`, error);
       return {
-        ingredientId,
+        ingredientName,
         quantitySold: 0
       };
     }

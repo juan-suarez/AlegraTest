@@ -63,7 +63,7 @@ export class HandlePurchaseCompletedUseCase {
           orderId: event.orderId,
         };
 
-        await this.eventBus.publish('order-events', 'IngredientsReserved', reservedEvent, 'inventory-service');
+        await this.eventBus.publish('IngredientsReserved', 'IngredientsReserved', reservedEvent, 'inventory-service');
       }
 
       await this.eventRepo.markEventProcessed(event.eventId);

@@ -46,7 +46,7 @@ export class HandlePurchaseFailedUseCase {
           orderId: event.orderId,
         };
 
-        await this.eventBus.publish('order-events', 'IngredientsPurchaseFailed', failedEvent, 'inventory-service');
+        await this.eventBus.publish('IngredientsPurchaseFailed', 'IngredientsPurchaseFailed', failedEvent, 'inventory-service');
         await this.eventRepo.markPurchaseFailedEventPublished(event.orderId);
       }
 

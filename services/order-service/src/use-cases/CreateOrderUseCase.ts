@@ -28,7 +28,7 @@ export class CreateOrderUseCase implements UseCase<CreateOrderInput, OrderCreate
       timestamp: new Date()
     };
     
-    await this.eventPublisher.publish('order-events', 'OrderCreated', event, 'order-service');
+    await this.eventPublisher.publish('OrderCreated', 'OrderCreated', event, 'order-service');
     await this.orderRepo.updateStatus(data.orderId, 'SELECTING_RECIPES');
 
     return event;

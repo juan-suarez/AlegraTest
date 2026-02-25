@@ -33,7 +33,7 @@ export class HandlePurchaseRequestedUseCase implements UseCase<PurchaseRequested
         await this.delay(delay);
       }
 
-      const response = await this.providerClient.purchaseIngredient(event.ingredientId);
+      const response = await this.providerClient.purchaseIngredient(event.ingredientName);
       accumulatedQuantity += response.quantitySold;
       retries++;
     }
@@ -45,7 +45,7 @@ export class HandlePurchaseRequestedUseCase implements UseCase<PurchaseRequested
         ingredientId: event.ingredientId,
         quantityPurchased: accumulatedQuantity,
       };
-      await this.eventBus.publish('inventory-events', 'PurchaseCompleted', completedEvent, 'purchasing-service');
+      await this.eventBus.publish('PurchaseCompleted', 'PurchaseCompleted', completedEvent, 'purchasing-service');
     } else {
       const failedEvent: PurchaseFailedEvent = {
         eventId: randomUUID(),
@@ -53,7 +53,7 @@ export class HandlePurchaseRequestedUseCase implements UseCase<PurchaseRequested
         ingredientId: event.ingredientId,
         quantityPurchased: accumulatedQuantity,
       };
-      await this.eventBus.publish('inventory-events', 'PurchaseFailed', failedEvent, 'purchasing-service');
+      await this.eventBus.publish('PurchaseFailed', 'PurchaseFailed', failedEvent, 'purchasing-service');
     }
 
     // Mark event as processed

@@ -6,6 +6,7 @@ export interface PurchaseRequestedEvent {
   eventId: string;
   orderId: string;
   ingredientId: string;
+  ingredientName: string;
   quantityRequired: number;
 }
 

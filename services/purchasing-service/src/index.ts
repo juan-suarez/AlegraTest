@@ -43,7 +43,6 @@ async function main() {
       endpoint: process.env.AWS_ENDPOINT || 'http://localhost:4566',
       accessKeyId: process.env.AWS_ACCESS_KEY_ID || 'test',
       secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || 'test',
-      topicArn: process.env.SNS_TOPIC_ARN || 'arn:aws:sns:us-east-1:000000000000:events',
       queueUrl: process.env.SQS_QUEUE_URL || 'https://sqs.us-east-1.amazonaws.com/000000000000/purchasing-service-queue',
       pollingIntervalMs: parseInt(process.env.POLLING_INTERVAL_MS || '1000', 10),
     };
@@ -55,10 +54,13 @@ async function main() {
 
     // Conectar handler
     const handler = eventRouter.getHandler();
-    await eventBus.startConsuming(handler);
+    eventBus.startConsuming(handler).catch((error) => {
+      console.error("❌ Error en consumer:", error);
+      process.exit(1);
+    });
     console.log('✅ EventBus escuchando eventos...');
 
-    console.log('\n✨ purchasing-service listo');
+    console.log('\n✨ purchasing-service está listo para recibir eventos');
   } catch (error) {
     console.error('❌ Error al inicializar:', error);
     process.exit(1);

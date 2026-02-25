@@ -1,5 +1,5 @@
 import { Pool } from 'pg';
-import { Ingredient } from '../services/types';
+import { Ingredient } from './interfaces';
 
 export class IngredientRepository {
   constructor(private pool: Pool) {}

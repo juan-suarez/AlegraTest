@@ -1,6 +1,4 @@
-/**
- * Event types for inventory use-cases
- */
+
 
 export interface IngredientsRequiredEvent {
   eventId: string;
@@ -36,5 +34,7 @@ export interface PurchaseRequestedEvent {
   eventId: string;
   orderId: string;
   ingredientId: string;
+  ingredientName: string;
   quantityRequired: number;
 }
+

@@ -47,7 +47,7 @@ export class HandleOrderCreatedUseCase implements UseCase<OrderCreatedEvent> {
       items
     };
 
-    await this.eventBus.publish('order-events', 'OrderItemsSelected', orderItemsEvent, 'kitchen-service');
+    await this.eventBus.publish('OrderItemsSelected', 'OrderItemsSelected', orderItemsEvent, 'kitchen-service');
 
     const totalIngredients: Record<string, number> = {};
     selectedRecipes.forEach(recipe => {
@@ -62,7 +62,7 @@ export class HandleOrderCreatedUseCase implements UseCase<OrderCreatedEvent> {
       ingredients: totalIngredients
     };
 
-    await this.eventBus.publish('inventory-events', 'IngredientsRequired', ingredientsEvent, 'kitchen-service');
+    await this.eventBus.publish('IngredientsRequired', 'IngredientsRequired', ingredientsEvent, 'kitchen-service');
 
     await this.eventRepo.markEventProcessed(event.eventId);
   }
