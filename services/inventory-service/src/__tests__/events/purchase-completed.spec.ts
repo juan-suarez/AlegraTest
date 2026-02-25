@@ -2,18 +2,19 @@ import { Pool } from 'pg';
 import { type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { startTestDatabase, stopTestDatabase, cleanDatabase } from '../helpers/database';
 import { TestDatabaseHelper } from '../helpers/test-helpers';
-import { InventoryService, EventPublisher } from '../../services/InventoryService';
+import { HandlePurchaseCompletedUseCase } from '../../use-cases';
 import { EventRepository, IngredientRepository, ReservationRepository } from '../../repositories';
 import { PurchaseCompletedHandler } from '../../events/handlers';
 import { randomUUID } from 'node:crypto';
+import { createMockEventBus } from '../helpers/eventbus';
 
 describe('Inventory Service - PurchaseCompleted Event', () => {
   let pool: Pool;
   let container: StartedPostgreSqlContainer;
   let dbHelper: TestDatabaseHelper;
-  let inventoryService: InventoryService;
+  let handlePurchaseCompletedUseCase: HandlePurchaseCompletedUseCase;
   let purchaseCompletedHandler: PurchaseCompletedHandler;
-  let mockPublisher: { published: Array<any>; publish: (type: string, event: any) => Promise<void> };
+  let mockEventBus: any;
 
   beforeAll(async () => {
     const { pool: testPool, container: testContainer } = await startTestDatabase();
@@ -33,22 +34,17 @@ describe('Inventory Service - PurchaseCompleted Event', () => {
     const ingredientRepo = new IngredientRepository(pool);
     const reservationRepo = new ReservationRepository(pool);
 
-    mockPublisher = {
-      published: [],
-      async publish(type: string, event: any) {
-        this.published.push({ type, event });
-      }
-    };
+    mockEventBus = createMockEventBus();
 
-    inventoryService = new InventoryService(
+    handlePurchaseCompletedUseCase = new HandlePurchaseCompletedUseCase(
       pool,
       eventRepo,
       ingredientRepo,
       reservationRepo,
-      mockPublisher as any
+      mockEventBus
     );
 
-    purchaseCompletedHandler = new PurchaseCompletedHandler(inventoryService);
+    purchaseCompletedHandler = new PurchaseCompletedHandler(handlePurchaseCompletedUseCase);
   });
 
   test('should update reservation to RESERVED when purchase completes', async () => {
@@ -78,9 +74,9 @@ describe('Inventory Service - PurchaseCompleted Event', () => {
     expect(ingredient.stock).toBe(0);
 
     // Should publish IngredientsReserved if all reservations are RESERVED
-    expect(mockPublisher.published).toHaveLength(1);
-    expect(mockPublisher.published[0].type).toBe('IngredientsReserved');
-    expect(mockPublisher.published[0].event.orderId).toBe(orderId);
+    expect(mockEventBus.published).toHaveLength(1);
+    expect(mockEventBus.published[0].type).toBe('IngredientsReserved');
+    expect(mockEventBus.published[0].event.orderId).toBe(orderId);
   });
 
   test('should add excess quantity to stock when purchase exceeds need', async () => {
@@ -131,7 +127,7 @@ describe('Inventory Service - PurchaseCompleted Event', () => {
     await purchaseCompletedHandler.handle(event1);
 
     // Should NOT publish IngredientsReserved yet (onion still pending)
-    expect(mockPublisher.published).toHaveLength(0);
+    expect(mockEventBus.published).toHaveLength(0);
 
     // Complete second purchase
     const event2 = {
@@ -144,8 +140,8 @@ describe('Inventory Service - PurchaseCompleted Event', () => {
     await purchaseCompletedHandler.handle(event2);
 
     // Now should publish IngredientsReserved
-    expect(mockPublisher.published).toHaveLength(1);
-    expect(mockPublisher.published[0].type).toBe('IngredientsReserved');
+    expect(mockEventBus.published).toHaveLength(1);
+    expect(mockEventBus.published[0].type).toBe('IngredientsReserved');
   });
 
   test('should add purchased quantity to stock if order was already released', async () => {
@@ -175,7 +171,7 @@ describe('Inventory Service - PurchaseCompleted Event', () => {
     expect(reservation.status).toBe('RELEASED');
 
     // Should NOT publish IngredientsReserved (order was already released)
-    expect(mockPublisher.published).toHaveLength(0);
+    expect(mockEventBus.published).toHaveLength(0);
   });
 
   test('should be idempotent for duplicate PurchaseCompleted events', async () => {
@@ -255,7 +251,7 @@ describe('Inventory Service - PurchaseCompleted Event', () => {
     const reservation = await dbHelper.getReservation(reservationId);
     expect(reservation.status).toBe('RESERVED');
 
-    expect(mockPublisher.published).toHaveLength(1);
-    expect(mockPublisher.published[0].type).toBe('IngredientsReserved');
+    expect(mockEventBus.published).toHaveLength(1);
+    expect(mockEventBus.published[0].type).toBe('IngredientsReserved');
   });
 });
