@@ -138,4 +138,3 @@ echo "⏳ Waiting 2 seconds before releasing services..."
 sleep 2
 
 exit 0
-

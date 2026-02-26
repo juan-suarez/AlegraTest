@@ -1,13 +1,29 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import * as http from 'http';
 import * as dotenv from 'dotenv';
 import pool from './db/connection';
 import { EventBusLocal, EventRouter } from './infrastructure/messaging';
+import { OrderController } from './controllers/OrderController';
+import { CreateOrderUseCase } from './use-cases/CreateOrderUseCase';
+import { OrderRepository } from './repositories/OrderRepository';
 
 // Cargar variables de entorno
 dotenv.config();
 
 let eventBus: EventBusLocal | null = null;
+let httpServer: http.Server | null = null;
+
+function createEventBusInstance(): EventBusLocal {
+  return new EventBusLocal({
+    region: process.env.AWS_REGION || 'us-east-1',
+    endpoint: process.env.AWS_ENDPOINT || 'http://localhost:4566',
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID || 'test',
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || 'test',
+    queueUrl: process.env.SQS_QUEUE_URL!,
+    pollingIntervalMs: parseInt(process.env.POLLING_INTERVAL_MS || '10000'),
+  });
+}
 
 async function initializeDatabase() {
   console.log('🚀 Inicializando order-service...');
@@ -43,19 +59,53 @@ async function initializeDatabase() {
   }
 }
 
-async function initializeEventBus() {
+async function initializeHttpServer(sharedEventBus: EventBusLocal) {
+  console.log('\n🌐 Inicializando HTTP Server...');
+
+  try {
+    const orderRepository = new OrderRepository(pool);
+    const createOrderUseCase = new CreateOrderUseCase(orderRepository, sharedEventBus);
+    const orderController = new OrderController(createOrderUseCase);
+
+    const PORT = parseInt(process.env.SERVICE_PORT || '3001');
+
+    httpServer = http.createServer(async (req, res) => {
+      // Health check endpoint
+      if (req.method === 'GET' && req.url === '/health') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'healthy', service: 'order-service' }));
+        return;
+      }
+
+      // POST /orders endpoint
+      if (req.method === 'POST' && req.url === '/orders') {
+        await orderController.handleCreateOrder(req, res);
+        return;
+      }
+
+      // 404 para rutas no encontradas
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Not found' }));
+    });
+
+    httpServer.listen(PORT, () => {
+      console.log(`✅ HTTP Server escuchando en puerto ${PORT}`);
+      console.log(`📍 Endpoints disponibles:`);
+      console.log(`   - GET  /health`);
+      console.log(`   - POST /orders`);
+    });
+  } catch (error) {
+    console.error('❌ Error al inicializar HTTP Server:', error);
+    throw error;
+  }
+}
+
+async function initializeEventBus(sharedEventBus: EventBusLocal) {
   console.log('\n🔌 Inicializando Event Bus...');
 
   try {
-    // Crear EventBusLocal
-    eventBus = new EventBusLocal({
-      region: process.env.AWS_REGION || 'us-east-1',
-      endpoint: process.env.AWS_ENDPOINT || 'http://localhost:4566',
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID || 'test',
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || 'test',
-      queueUrl: process.env.SQS_QUEUE_URL!,
-      pollingIntervalMs: parseInt(process.env.POLLING_INTERVAL_MS || '10000'),
-    });
+    // Usar la instancia compartida del EventBus
+    eventBus = sharedEventBus;
 
     // Crear router (que crea handlers y use cases internamente)
     const eventRouter = new EventRouter(pool);
@@ -79,6 +129,12 @@ async function initializeEventBus() {
 async function gracefulShutdown() {
   console.log('\n🛑 Cerrando order-service...');
 
+  if (httpServer) {
+    httpServer.close(() => {
+      console.log('✅ HTTP Server cerrado');
+    });
+  }
+
   if (eventBus) {
     eventBus.stop();
   }
@@ -94,9 +150,27 @@ process.on('SIGTERM', gracefulShutdown);
 
 // Iniciar aplicación
 async function main() {
+  const ENABLE_HTTP_SERVER = process.env.ENABLE_HTTP_SERVER !== 'false';
+  const RUNTIME_MODE = ENABLE_HTTP_SERVER ? 'local (HTTP + EventBus)' : 'lambda (EventBus only)';
+  
   try {
+    console.log(`🎯 Iniciando en modo: ${RUNTIME_MODE}\n`);
+    
     await initializeDatabase();
-    await initializeEventBus();
+    
+    // Crear una única instancia del EventBus compartida
+    const sharedEventBus = createEventBusInstance();
+    
+    // Inicializar HTTP Server solo si está habilitado
+    if (ENABLE_HTTP_SERVER) {
+      await initializeHttpServer(sharedEventBus);
+    } else {
+      console.log('\n⏭️  HTTP Server deshabilitado (ENABLE_HTTP_SERVER=false)');
+      console.log('📌 Modo Lambda: Solo EventBus activo');
+    }
+    
+    // Inicializar Event Bus
+    await initializeEventBus(sharedEventBus);
   } catch (error) {
     console.error('❌ Error fatal:', error);
     process.exit(1);

@@ -96,6 +96,7 @@ services:
       SQS_QUEUE_URL: https://sqs.us-east-1.amazonaws.com/000000000000/order-service-queue
       SERVICE_PORT: 3001
       POLLING_INTERVAL_MS: 1000
+      ENABLE_HTTP_SERVER: "true"
     ports:
       - "3001:3001"
     networks:
@@ -131,6 +132,7 @@ services:
       SQS_QUEUE_URL: https://sqs.us-east-1.amazonaws.com/000000000000/kitchen-service-queue
       SERVICE_PORT: 3002
       POLLING_INTERVAL_MS: 1000
+      ENABLE_HTTP_SERVER: "true"
     ports:
       - "3002:3002"
     networks:
@@ -166,6 +168,7 @@ services:
       SQS_QUEUE_URL: https://sqs.us-east-1.amazonaws.com/000000000000/inventory-service-queue
       SERVICE_PORT: 3003
       POLLING_INTERVAL_MS: 1000
+      ENABLE_HTTP_SERVER: "true"
     ports:
       - "3003:3003"
     networks:
@@ -201,6 +204,7 @@ services:
       SQS_QUEUE_URL: https://sqs.us-east-1.amazonaws.com/000000000000/purchasing-service-queue
       SERVICE_PORT: 3004
       POLLING_INTERVAL_MS: 1000
+      ENABLE_HTTP_SERVER: "true"
     ports:
       - "3004:3004"
     networks:
