@@ -8,7 +8,7 @@
     "dev": "docker-compose up",
     "dev:services": "docker-compose up order-service kitchen-service inventory-service purchasing-service",
     "dev:test": "npm run dev & sleep 60 && npm run test:e2e",
-    "test:e2e": "npx ts-node -P ./infraestructure/e2e-tests/tsconfig.json ./infraestructure/e2e-tests/test-e2e.ts",
+    "test:e2e": "npx ts-node -P ./infraestructure/local/e2e-tests/tsconfig.json ./infraestructure/local/e2e-tests/test-e2e.ts",
     "build": "docker-compose build",
     "down": "docker-compose down",
     "down:v": "docker-compose down -v",

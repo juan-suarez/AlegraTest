@@ -16,7 +16,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./infraestructure/postgres/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
+      - ./infraestructure/local/postgres/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh
     networks:
       - restaurant-network
     healthcheck:
@@ -39,7 +39,7 @@ services:
       - AWS_SECRET_ACCESS_KEY=test
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
-      - "./infraestructure/localstack/init-aws.sh:/docker-entrypoint-initaws.d/init-aws.sh"
+      - "./infraestructure/local/localstack/init-aws.sh:/docker-entrypoint-initaws.d/init-aws.sh"
     networks:
       - restaurant-network
     healthcheck:
@@ -63,7 +63,7 @@ services:
       - AWS_ENDPOINT_URL_SNS=http://localstack:4566
       - AWS_ENDPOINT_URL_SQS=http://localstack:4566
     volumes:
-      - "./infraestructure/localstack/init-aws.sh:/docker-entrypoint-initaws.d/init-aws.sh"
+      - "./infraestructure/local/localstack/init-aws.sh:/docker-entrypoint-initaws.d/init-aws.sh"
     entrypoint: /bin/bash -c "bash /docker-entrypoint-initaws.d/init-aws.sh && sleep 2"
     networks:
       - restaurant-network
@@ -223,7 +223,7 @@ services:
   # e2e-tester:
   #   build:
   #     context: .
-  #     dockerfile: ./infraestructure/e2e-tests/Dockerfile
+  #     dockerfile: ./infraestructure/local/e2e-tests/Dockerfile
   #   container_name: restaurant-e2e-tester
   #   depends_on:
   #     order-service:
