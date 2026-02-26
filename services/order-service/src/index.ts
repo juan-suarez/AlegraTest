@@ -150,14 +150,24 @@ process.on('SIGTERM', gracefulShutdown);
 
 // Iniciar aplicación
 async function main() {
+  const ENABLE_HTTP_SERVER = process.env.ENABLE_HTTP_SERVER !== 'false';
+  const RUNTIME_MODE = ENABLE_HTTP_SERVER ? 'local (HTTP + EventBus)' : 'lambda (EventBus only)';
+  
   try {
+    console.log(`🎯 Iniciando en modo: ${RUNTIME_MODE}\n`);
+    
     await initializeDatabase();
     
     // Crear una única instancia del EventBus compartida
     const sharedEventBus = createEventBusInstance();
     
-    // Inicializar HTTP Server
-    await initializeHttpServer(sharedEventBus);
+    // Inicializar HTTP Server solo si está habilitado
+    if (ENABLE_HTTP_SERVER) {
+      await initializeHttpServer(sharedEventBus);
+    } else {
+      console.log('\n⏭️  HTTP Server deshabilitado (ENABLE_HTTP_SERVER=false)');
+      console.log('📌 Modo Lambda: Solo EventBus activo');
+    }
     
     // Inicializar Event Bus
     await initializeEventBus(sharedEventBus);
