@@ -1,12 +1,12 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as dotenv from 'dotenv';
 import * as http from 'http';
+import * as dotenv from 'dotenv';
 import pool from './db/connection';
 import { EventBusLocal, EventRouter } from './infrastructure/messaging';
-import { CreateOrderUseCase } from './use-cases';
-import { OrderRepository } from './repositories';
-import { OrderController } from './controllers';
+import { OrderController } from './controllers/OrderController';
+import { CreateOrderUseCase } from './use-cases/CreateOrderUseCase';
+import { OrderRepository } from './repositories/OrderRepository';
 
 // Cargar variables de entorno
 dotenv.config();
@@ -59,59 +59,43 @@ async function initializeDatabase() {
   }
 }
 
-function initializeHttpServer(sharedEventBus: EventBusLocal) {
-  console.log('\n🌐 Inicializando servidor HTTP...');
+async function initializeHttpServer(sharedEventBus: EventBusLocal) {
+  console.log('\n🌐 Inicializando HTTP Server...');
 
   try {
-    // Instanciar dependencias
     const orderRepository = new OrderRepository(pool);
-
-    // Crear use cases y controladores usando el EventBus compartido
     const createOrderUseCase = new CreateOrderUseCase(orderRepository, sharedEventBus);
     const orderController = new OrderController(createOrderUseCase);
 
-    // Crear servidor HTTP
-    httpServer = http.createServer(async (req, res) => {
-      // Configurar CORS headers
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    const PORT = parseInt(process.env.SERVICE_PORT || '3001');
 
-      // Manejar preflight requests
-      if (req.method === 'OPTIONS') {
-        res.writeHead(200);
-        res.end();
+    httpServer = http.createServer(async (req, res) => {
+      // Health check endpoint
+      if (req.method === 'GET' && req.url === '/health') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'healthy', service: 'order-service' }));
         return;
       }
 
-      // Parsear URL
-      const url = new URL(req.url || '/', `http://${req.headers.host}`);
-      const pathname = url.pathname;
-
-      // Routing
-      if (pathname === '/orders' && req.method === 'POST') {
+      // POST /orders endpoint
+      if (req.method === 'POST' && req.url === '/orders') {
         await orderController.handleCreateOrder(req, res);
-      } else if (pathname === '/health' && req.method === 'GET') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ status: 'ok', service: 'order-service' }));
-      } else {
-        res.writeHead(404, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({
-          error: 'Not Found',
-          path: pathname,
-          method: req.method
-        }));
+        return;
       }
+
+      // 404 para rutas no encontradas
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Not found' }));
     });
 
-    const port = parseInt(process.env.SERVICE_PORT || '3001', 10);
-    httpServer.listen(port, () => {
-      console.log(`✅ Servidor HTTP escuchando en puerto ${port}`);
-      console.log(`📍 POST http://localhost:${port}/orders - Crear orden`);
-      console.log(`📍 GET http://localhost:${port}/health - Health check`);
+    httpServer.listen(PORT, () => {
+      console.log(`✅ HTTP Server escuchando en puerto ${PORT}`);
+      console.log(`📍 Endpoints disponibles:`);
+      console.log(`   - GET  /health`);
+      console.log(`   - POST /orders`);
     });
   } catch (error) {
-    console.error('❌ Error al inicializar servidor HTTP:', error);
+    console.error('❌ Error al inicializar HTTP Server:', error);
     throw error;
   }
 }
@@ -147,7 +131,7 @@ async function gracefulShutdown() {
 
   if (httpServer) {
     httpServer.close(() => {
-      console.log('✅ Servidor HTTP cerrado');
+      console.log('✅ HTTP Server cerrado');
     });
   }
 
@@ -172,8 +156,10 @@ async function main() {
     // Crear una única instancia del EventBus compartida
     const sharedEventBus = createEventBusInstance();
     
-    // Pasar la instancia compartida a ambas funciones
-    initializeHttpServer(sharedEventBus);
+    // Inicializar HTTP Server
+    await initializeHttpServer(sharedEventBus);
+    
+    // Inicializar Event Bus
     await initializeEventBus(sharedEventBus);
   } catch (error) {
     console.error('❌ Error fatal:', error);

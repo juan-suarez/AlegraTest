@@ -24,6 +24,7 @@ export interface CreateOrderInput {
 }
 
 export interface OrderCreatedEvent {
+  eventId: string;
   orderId: string;
   totalDishes: number;
   timestamp: Date;

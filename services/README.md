@@ -275,3 +275,184 @@ Para pruebas locales:
 - Cada servicio se conecta vía variables de entorno.
 - Los topics y colas se crean automáticamente al iniciar el entorno local.
 - Se pueden ejecutar pruebas end-to-end publicando eventos en el bus simulado.
+
+---
+
+## 8. Exposición HTTP: order-service
+
+### 8.1 Arquitectura actual
+
+`order-service` es el único punto de entrada HTTP del sistema. Expone un servidor HTTP nativo (Node.js) que recibe solicitudes para crear órdenes.
+
+**Endpoint disponible:**
+```
+POST http://localhost:3001/orders
+GET  http://localhost:3001/health
+```
+
+**Request body:**
+```json
+{
+  "orderId": "550e8400-e29b-41d4-a716-446655440000",
+  "totalDishes": 3
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "eventId": "7a6e8b27-8e03-4aad-955d-0f2c4e3c4d2b",
+    "orderId": "550e8400-e29b-41d4-a716-446655440000",
+    "totalDishes": 3,
+    "timestamp": "2026-02-26T13:23:04.627Z"
+  }
+}
+```
+
+### 8.2 Validaciones implementadas
+
+- `orderId`: Requerido, string, formato UUID válido
+- `totalDishes`: Requerido, número entero positivo
+- Sin campos adicionales permitidos
+
+**Ejemplo de error de validación:**
+```json
+{
+  "error": "Validation failed",
+  "details": [
+    "Field \"orderId\" must be a valid UUID",
+    "Field \"totalDishes\" must be greater than 0"
+  ]
+}
+```
+
+### 8.3 Flujo de procesamiento
+
+1. Cliente HTTP → `POST /orders`
+2. `OrderController` valida el request
+3. `CreateOrderUseCase` ejecuta:
+   - Guarda orden en PostgreSQL
+   - Genera `eventId` único
+   - Publica evento `OrderCreated` a SNS
+4. Retorna respuesta HTTP 201
+5. Sistema event-driven continúa asíncronamente
+
+### 8.4 Opción alternativa: API Gateway + Lambda (AWS)
+
+En un entorno de producción AWS real, la arquitectura podría usar:
+
+```
+Cliente → API Gateway → Lambda → SNS → Microservicios
+```
+
+**Ventajas:**
+- Serverless (sin gestión de servidores)
+- Auto-scaling automático
+- Integración nativa con AWS
+
+**Configuración de API Gateway con Lambda:**
+
+```bash
+# 1. Crear REST API
+api_id=$(aws apigateway create-rest-api \
+  --name "restaurant-api" \
+  --output text --query 'id')
+
+# 2. Crear recurso /orders
+orders_id=$(aws apigateway create-resource \
+  --rest-api-id "$api_id" \
+  --parent-id "$root_id" \
+  --path-part "orders" \
+  --output text --query 'id')
+
+# 3. Crear método POST
+aws apigateway put-method \
+  --rest-api-id "$api_id" \
+  --resource-id "$orders_id" \
+  --http-method POST \
+  --authorization-type NONE
+
+# 4. Integrar con Lambda (AWS_PROXY)
+aws apigateway put-integration \
+  --rest-api-id "$api_id" \
+  --resource-id "$orders_id" \
+  --http-method POST \
+  --type AWS_PROXY \
+  --integration-http-method POST \
+  --uri "arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/arn:aws:lambda:us-east-1:ACCOUNT_ID:function:order-handler/invocations"
+
+# 5. Desplegar
+aws apigateway create-deployment \
+  --rest-api-id "$api_id" \
+  --stage-name "prod"
+```
+
+### 8.5 Opción alternativa: API Gateway + HTTP Backend
+
+Si se prefiere mantener el servidor HTTP pero exponer a través de API Gateway:
+
+```bash
+# Integración HTTP_PROXY
+aws apigateway put-integration \
+  --rest-api-id "$api_id" \
+  --resource-id "$orders_id" \
+  --http-method POST \
+  --type HTTP_PROXY \
+  --integration-http-method POST \
+  --uri "http://order-service:3001/orders"
+```
+
+**Parámetros clave:**
+- `--type HTTP_PROXY`: Forwarding directo sin transformaciones
+- `--integration-http-method POST`: Método HTTP real al backend
+- `--uri`: URL completa del servicio (debe ser accesible desde API Gateway)
+
+### 8.6 Por qué usamos HTTP directo en desarrollo local
+
+**Razones técnicas:**
+
+1. **LocalStack Community Edition** tiene limitaciones con Lambda:
+   - Lambda no se ejecuta correctamente en LocalStack CE
+   - HTTP_PROXY tiene bugs conocidos en versión gratuita
+   - Difícil debugging sin logs detallados
+
+2. **Simplicidad para desarrollo local:**
+   - HTTP directo es más fácil de debuggear
+   - Curl directo a `localhost:3001`
+   - Sin intermediarios que puedan fallar
+
+3. **Pragmatismo:**
+   - El código está listo para Lambda (se mantiene como referencia)
+   - Para producción AWS real, se migraría a Lambda
+   - Para desarrollo local, HTTP nativo es más confiable
+
+**Arquitectura recomendada por entorno:**
+
+| Entorno | Arquitectura |
+|---------|--------------|
+| **Desarrollo local** | HTTP directo (puerto 3001) |
+| **Staging/QA** | API Gateway + Lambda |
+| **Producción** | API Gateway + Lambda + WAF |
+
+### 8.7 Componentes clave del código
+
+**OrderController** (`services/order-service/src/controllers/OrderController.ts`)
+- Maneja requests HTTP nativos
+- Valida estructura y tipos
+- Invoca `CreateOrderUseCase`
+- Retorna respuestas HTTP estándar
+
+**HTTP Server** (`services/order-service/src/index.ts`)
+- Servidor HTTP nativo Node.js
+- Routing simple (POST /orders, GET /health)
+- Puerto configurable via `SERVICE_PORT` (default: 3001)
+
+**CreateOrderUseCase** (`services/order-service/src/use-cases/CreateOrderUseCase.ts`)
+- Lógica de negocio independiente del transporte
+- Persiste en PostgreSQL
+- Publica evento a SNS
+- Reutilizable tanto para HTTP como Lambda
+
+---
