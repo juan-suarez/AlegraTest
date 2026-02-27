@@ -1,10 +1,12 @@
 import * as cdk from 'aws-cdk-lib';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
+import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
 import { Construct } from 'constructs';
 import path = require('path');
@@ -20,6 +22,8 @@ export interface LambdaServicesProps {
   dbHost: string;
   dbPort: number;
   dbUsername: string;
+  dbIamUsername: string; // IAM user for database authentication
+  dbInstanceResourceId: string; // RDS instance resource ID for IAM auth
   dbPasswordSecret: secretsmanager.ISecret;
 }
 
@@ -70,10 +74,26 @@ export class LambdaServicesConstruct extends Construct {
     // Grant permission to read database password from Secrets Manager
     props.dbPasswordSecret.grantRead(lambdaRole);
 
+    // Grant permission for IAM database authentication
+    // This allows Lambda to connect as the IAM DB user
+    const dbUserArn = cdk.Stack.of(this).formatArn({
+      service: 'rds-db',
+      resource: 'dbuser',
+      resourceName: `${props.dbInstanceResourceId}/${props.dbIamUsername}`,
+    });
+
+    lambdaRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        effect: iam.Effect.ALLOW,
+        actions: ['rds-db:connect'],
+        resources: [dbUserArn],
+      }),
+    );
+
     // Order Service Lambda
     const orderServiceLambda = this.createServiceLambda(
       'OrderService',
-      path.join(__dirname, '../../services/order-service'),
+      path.join(__dirname, '../../../../services/order-service'),
       props,
       lambdaRole,
       props.queues.orderServiceQueue,
@@ -89,7 +109,7 @@ export class LambdaServicesConstruct extends Construct {
     // Kitchen Service Lambda
     const kitchenServiceLambda = this.createServiceLambda(
       'KitchenService',
-      path.join(__dirname, '../../services/kitchen-service'),
+      path.join(__dirname, '../../../../services/kitchen-service'),
       props,
       lambdaRole,
       props.queues.kitchenServiceQueue,
@@ -105,7 +125,7 @@ export class LambdaServicesConstruct extends Construct {
     // Inventory Service Lambda
     const inventoryServiceLambda = this.createServiceLambda(
       'InventoryService',
-      path.join(__dirname, '../../services/inventory-service'),
+      path.join(__dirname, '../../../../services/inventory-service'),
       props,
       lambdaRole,
       props.queues.inventoryServiceQueue,
@@ -121,7 +141,7 @@ export class LambdaServicesConstruct extends Construct {
     // Purchasing Service Lambda
     const purchasingServiceLambda = this.createServiceLambda(
       'PurchasingService',
-      path.join(__dirname, '../../services/purchasing-service'),
+      path.join(__dirname, '../../../../services/purchasing-service'),
       props,
       lambdaRole,
       props.queues.purchasingServiceQueue,
@@ -149,13 +169,13 @@ export class LambdaServicesConstruct extends Construct {
     role: iam.Role,
     serviceQueue: sqs.Queue,
   ): lambda.Function {
-    // Create Lambda function with timeout for polling
-    const lambdaFunction = new lambda.Function(this, `${serviceName}Function`, {
+    // Create Lambda function with NodejsFunction (auto-bundles dependencies)
+    const lambdaFunction = new NodejsFunction(this, `${serviceName}Function`, {
       functionName: `restaurant-${serviceName.toLowerCase()}`,
       runtime: lambda.Runtime.NODEJS_18_X,
-      handler: 'dist/lambda.handler',
-      code: lambda.Code.fromAsset(servicePath),
-      timeout: cdk.Duration.seconds(300), // 5 minutes for polling loop
+      entry: path.join(servicePath, 'src', 'lambda.ts'),
+      handler: 'handler',
+      timeout: cdk.Duration.seconds(300),
       memorySize: 256,
       role,
       environment: {
@@ -167,9 +187,15 @@ export class LambdaServicesConstruct extends Construct {
         SQS_QUEUE_URL: serviceQueue.queueUrl,
         POLLING_INTERVAL_MS: '1000',
         SERVICE_PORT: '3000',
-        AWS_REGION: cdk.Stack.of(this).region,
+        AWS_ENDPOINT: '', // Empty = use real AWS, not LocalStack
+        AWS_ACCOUNT_ID: cdk.Stack.of(this).account,
       },
       logRetention: logs.RetentionDays.ONE_WEEK,
+      bundling: {
+        minify: false,
+        sourceMap: true,
+        externalModules: ['aws-sdk'], // AWS SDK is available in Lambda runtime
+      },
     });
 
     // Add CloudWatch Logs

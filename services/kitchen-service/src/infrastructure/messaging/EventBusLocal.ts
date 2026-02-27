@@ -19,14 +19,19 @@ export class EventBusLocal {
     this.config = config;
     this.handler = handler;
 
-    const clientConfig = {
+    const clientConfig: any = {
       region: config.region,
-      credentials: {
-        accessKeyId: config.accessKeyId,
-        secretAccessKey: config.secretAccessKey,
-      },
       ...(config.endpoint && { endpoint: config.endpoint }),
     };
+
+    // Only add credentials if they are provided and not empty
+    if (config.accessKeyId && config.secretAccessKey) {
+      clientConfig.credentials = {
+        accessKeyId: config.accessKeyId,
+        secretAccessKey: config.secretAccessKey,
+      };
+    }
+    // Otherwise, AWS SDK will use default credential resolution (IAM role in Lambda)
 
     this.snsClient = new SNSClient(clientConfig);
     this.sqsClient = new SQSClient(clientConfig);
@@ -44,7 +49,8 @@ export class EventBusLocal {
       data,
     };
 
-    const topicArn = `arn:aws:sns:${this.config.region}:000000000000:${topicName}`;
+    const accountId = this.config.accountId || '000000000000'; // Use real account ID if provided, else fake for LocalStack
+    const topicArn = `arn:aws:sns:${this.config.region}:${accountId}:${topicName}`;
 
     const command = new PublishCommand({
       TopicArn: topicArn,

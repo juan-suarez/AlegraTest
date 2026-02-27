@@ -26,8 +26,6 @@ export class ApiGatewayConstruct extends Construct {
       deploy: true,
       deployOptions: {
         stageName: 'prod',
-        loggingLevel: apigateway.MethodLoggingLevel.INFO,
-        dataTraceEnabled: true,
         metricsEnabled: true,
       },
       defaultCorsPreflightOptions: {
@@ -75,11 +73,5 @@ export class ApiGatewayConstruct extends Construct {
       endpoint: restApi.url,
     };
 
-    // Output the API endpoint
-    new cdk.CfnOutput(this, 'ApiEndpoint', {
-      value: this.output.endpoint,
-      description: 'API Gateway endpoint URL',
-      exportName: 'RestaurantApiEndpoint',
-    });
   }
 }

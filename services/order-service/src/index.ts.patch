@@ -1,0 +1,27 @@
+--- a/services/order-service/src/index.ts
++++ b/services/order-service/src/index.ts
+@@ -178,3 +178,22 @@ async function main() {
+ }
+ 
+ main();
++
++// Export initialize function for Lambda handlers
++export async function initializeServices(): Promise<EventBusLocal | null> {
++  try {
++    const ENABLE_HTTP_SERVER = process.env.ENABLE_HTTP_SERVER !== 'false';
++    
++    await initializeDatabase();
++
++    const sharedEventBus = createEventBusInstance();
++
++    if (ENABLE_HTTP_SERVER) {
++      await initializeHttpServer(sharedEventBus);
++    }
++
++    await initializeEventBus(sharedEventBus);
++    return eventBus;
++  } catch (error) {
++    console.error('❌ Error initializing services:', error);
++    throw error;
++  }
++}

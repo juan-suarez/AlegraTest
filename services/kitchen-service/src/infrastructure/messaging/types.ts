@@ -10,9 +10,10 @@ export interface EventEnvelope<T = any> {
 // Configuración de EventBusLocal
 export interface EventBusConfig {
   region: string;
+  accountId?: string; // AWS Account ID for SNS topic ARN (defaults to fake account for LocalStack)
   endpoint?: string; // Para LocalStack
-  accessKeyId: string;
-  secretAccessKey: string;
+  accessKeyId?: string;
+  secretAccessKey?: string;
   queueUrl: string;
   pollingIntervalMs: number;
 }

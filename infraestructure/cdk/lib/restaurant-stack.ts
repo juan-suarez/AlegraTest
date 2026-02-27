@@ -28,6 +28,8 @@ export class RestaurantStack extends cdk.Stack {
       dbHost: database.output.host,
       dbPort: database.output.port,
       dbUsername: database.output.username,
+      dbIamUsername: database.output.iamUsername,
+      dbInstanceResourceId: database.output.instanceResourceId,
       dbPasswordSecret: database.output.passwordSecret,
     });
 

@@ -38,14 +38,21 @@ async function main() {
 
     // Inicializar EventBus
     console.log('\n📡 Inicializando EventBus...');
-    const eventBusConfig = {
+    const eventBusConfig: any = {
       region: process.env.AWS_REGION || 'us-east-1',
-      endpoint: process.env.AWS_ENDPOINT || 'http://localhost:4566',
-      accessKeyId: process.env.AWS_ACCESS_KEY_ID || 'test',
-      secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || 'test',
+      accountId: process.env.AWS_ACCOUNT_ID,
       queueUrl: process.env.SQS_QUEUE_URL || 'https://sqs.us-east-1.amazonaws.com/000000000000/purchasing-service-queue',
       pollingIntervalMs: parseInt(process.env.POLLING_INTERVAL_MS || '1000', 10),
     };
+    
+    // Only use LocalStack endpoint in local development
+    if (process.env.AWS_ENDPOINT && process.env.AWS_ENDPOINT.includes('localhost')) {
+      eventBusConfig.endpoint = process.env.AWS_ENDPOINT;
+      eventBusConfig.accessKeyId = process.env.AWS_ACCESS_KEY_ID || 'test';
+      eventBusConfig.secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY || 'test';
+    }
+    // In Lambda/AWS, credentials come from IAM role (not passed explicitly)
+    
     eventBus = new EventBusLocal(eventBusConfig);
 
     // Inicializar EventRouter
