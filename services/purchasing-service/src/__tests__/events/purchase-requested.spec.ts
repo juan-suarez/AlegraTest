@@ -3,7 +3,7 @@ import { type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { startTestDatabase, stopTestDatabase, cleanDatabase } from '../helpers/database';
 import { TestDatabaseHelper } from '../helpers/test-helpers';
 import { ProviderClient } from '../../services/ProviderClient';
-import { EventRepository } from '../../repositories';
+import { EventRepository, PurchaseHistoryRepository } from '../../repositories';
 import { PurchaseRequestedHandler } from '../../events/handlers';
 import { HandlePurchaseRequestedUseCase } from '../../use-cases';
 import { createMockEventBus } from '../helpers/eventbus';
@@ -34,6 +34,7 @@ describe('Purchasing Service - PurchaseRequested Event', () => {
     await cleanDatabase(pool);
 
     const eventRepo = new EventRepository(pool);
+    const purchaseHistoryRepo = new PurchaseHistoryRepository(pool);
 
     mockProviderClient = {
       purchaseIngredient: jest.fn(),
@@ -43,6 +44,7 @@ describe('Purchasing Service - PurchaseRequested Event', () => {
 
     handlePurchaseRequestedUseCase = new HandlePurchaseRequestedUseCase(
       eventRepo,
+      purchaseHistoryRepo,
       mockProviderClient,
       mockEventBus
     );
@@ -64,6 +66,7 @@ describe('Purchasing Service - PurchaseRequested Event', () => {
       eventId,
       orderId,
       ingredientId,
+      ingredientName: 'Tomato',
       quantityRequired: 5
     };
 
@@ -72,7 +75,7 @@ describe('Purchasing Service - PurchaseRequested Event', () => {
     expect(await dbHelper.isEventProcessed(eventId)).toBe(true);
     
     expect(mockProviderClient.purchaseIngredient).toHaveBeenCalledTimes(1);
-    expect(mockProviderClient.purchaseIngredient).toHaveBeenCalledWith(ingredientId);
+    expect(mockProviderClient.purchaseIngredient).toHaveBeenCalledWith(event.ingredientName);
     
     expect(mockEventBus.publish).toHaveBeenCalled();
     const publishCall = mockEventBus.publish.mock.calls[0];
@@ -96,6 +99,7 @@ describe('Purchasing Service - PurchaseRequested Event', () => {
       eventId,
       orderId,
       ingredientId,
+      ingredientName: 'Onion',
       quantityRequired: 6
     };
 
@@ -126,6 +130,7 @@ describe('Purchasing Service - PurchaseRequested Event', () => {
       eventId,
       orderId,
       ingredientId,
+      ingredientName: 'Pepper',
       quantityRequired: 10
     };
 
@@ -157,6 +162,7 @@ describe('Purchasing Service - PurchaseRequested Event', () => {
       eventId,
       orderId,
       ingredientId,
+      ingredientName: 'Garlic',
       quantityRequired: 5
     };
 
@@ -186,6 +192,7 @@ describe('Purchasing Service - PurchaseRequested Event', () => {
       eventId,
       orderId,
       ingredientId,
+      ingredientName: 'Salt',
       quantityRequired: 5
     };
 
@@ -211,6 +218,7 @@ describe('Purchasing Service - PurchaseRequested Event', () => {
       eventId,
       orderId,
       ingredientId,
+      ingredientName: 'Basil',
       quantityRequired: 10
     };
 
@@ -238,6 +246,7 @@ describe('Purchasing Service - PurchaseRequested Event', () => {
       eventId,
       orderId,
       ingredientId,
+      ingredientName: 'Rare Spice',
       quantityRequired: 5
     };
 
@@ -250,4 +259,71 @@ describe('Purchasing Service - PurchaseRequested Event', () => {
     expect(publishCall[1]).toBe('PurchaseFailed');
     expect(publishCall[2].quantityPurchased).toBe(0);
   });
+
+  // ==================== Purchase History Integration Tests ====================
+
+  test('should save purchase history when purchase is completed', async () => {
+    const orderId = randomUUID();
+    const eventId = randomUUID();
+    const ingredientId = 'tomato';
+    const ingredientName = 'Tomato';
+    
+    mockProviderClient.purchaseIngredient.mockResolvedValueOnce({
+      ingredientId,
+      quantitySold: 5
+    });
+
+    const event = {
+      eventId,
+      orderId,
+      ingredientId,
+      ingredientName,
+      quantityRequired: 5
+    };
+
+    await purchaseRequestedHandler.handle(event);
+
+    // Verificar que se guardó en el historial
+    const history = await dbHelper.getPurchaseHistoryByOrderId(orderId);
+    expect(history).toHaveLength(1);
+    expect(history[0].order_id).toBe(orderId);
+    expect(history[0].ingredient_id).toBe(ingredientId);
+    expect(history[0].ingredient_name).toBe(ingredientName);
+    expect(history[0].quantity_requested).toBe(5);
+    expect(history[0].quantity_purchased).toBe(5);
+    expect(history[0].status).toBe('COMPLETED');
+  });
+
+  test('should save purchase history when purchase fails', async () => {
+    const orderId = randomUUID();
+    const eventId = randomUUID();
+    const ingredientId = 'pepper';
+    const ingredientName = 'Pepper';
+    
+    mockProviderClient.purchaseIngredient.mockResolvedValue({
+      ingredientId,
+      quantitySold: 1
+    });
+
+    const event = {
+      eventId,
+      orderId,
+      ingredientId,
+      ingredientName,
+      quantityRequired: 10
+    };
+
+    await purchaseRequestedHandler.handle(event);
+
+    // Verificar que se guardó en el historial con status FAILED
+    const history = await dbHelper.getPurchaseHistoryByOrderId(orderId);
+    expect(history).toHaveLength(1);
+    expect(history[0].order_id).toBe(orderId);
+    expect(history[0].ingredient_id).toBe(ingredientId);
+    expect(history[0].ingredient_name).toBe(ingredientName);
+    expect(history[0].quantity_requested).toBe(10);
+    expect(history[0].quantity_purchased).toBe(3); // 1 + 1 + 1 (3 retries)
+    expect(history[0].status).toBe('FAILED');
+  });
 });
+

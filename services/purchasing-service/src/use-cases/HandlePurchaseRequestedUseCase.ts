@@ -1,4 +1,4 @@
-import { EventRepository } from '../repositories';
+import { EventRepository, PurchaseHistoryRepository } from '../repositories';
 import { ProviderClient } from '../externals';
 import { EventBusLocal } from '../infrastructure/messaging';
 import {
@@ -15,6 +15,7 @@ export class HandlePurchaseRequestedUseCase implements UseCase<PurchaseRequested
 
   constructor(
     private eventRepo: EventRepository,
+    private purchaseHistoryRepo: PurchaseHistoryRepository,
     private providerClient: ProviderClient,
     private eventBus: EventBusLocal
   ) {}
@@ -61,6 +62,19 @@ export class HandlePurchaseRequestedUseCase implements UseCase<PurchaseRequested
 
     if (accumulatedQuantity >= event.quantityRequired) {
       console.log('✅ Purchase successful, publishing PurchaseCompleted event');
+      
+      // Guardar en historial
+      await this.purchaseHistoryRepo.create({
+        id: randomUUID(),
+        orderId: event.orderId,
+        ingredientId: event.ingredientId,
+        ingredientName: event.ingredientName,
+        quantityRequested: event.quantityRequired,
+        quantityPurchased: accumulatedQuantity,
+        status: 'COMPLETED',
+      });
+      console.log('📝 Purchase history saved (COMPLETED)');
+      
       const completedEvent: PurchaseCompletedEvent = {
         eventId: randomUUID(),
         orderId: event.orderId,
@@ -70,6 +84,19 @@ export class HandlePurchaseRequestedUseCase implements UseCase<PurchaseRequested
       await this.eventBus.publish('PurchaseCompleted', 'PurchaseCompleted', completedEvent, 'purchasing-service');
     } else {
       console.log('❌ Purchase failed, publishing PurchaseFailed event');
+      
+      // Guardar en historial
+      await this.purchaseHistoryRepo.create({
+        id: randomUUID(),
+        orderId: event.orderId,
+        ingredientId: event.ingredientId,
+        ingredientName: event.ingredientName,
+        quantityRequested: event.quantityRequired,
+        quantityPurchased: accumulatedQuantity,
+        status: 'FAILED',
+      });
+      console.log('📝 Purchase history saved (FAILED)');
+      
       const failedEvent: PurchaseFailedEvent = {
         eventId: randomUUID(),
         orderId: event.orderId,
