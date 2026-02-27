@@ -47,7 +47,7 @@ async function initializeOnColdStart() {
 async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> {
   const { httpMethod, path, queryStringParameters } = event;
 
-  console.log(`📥 API Gateway: ${httpMethod} ${path}`);
+  console.log(`📥 API Gateway: ${httpMethod} ${path}`, JSON.stringify(event));
 
   // Health check
   if (httpMethod === 'GET' && path === '/health') {
@@ -58,8 +58,8 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
     };
   }
 
-  // GET /purchases - List all purchases or filter by orderId/ingredientId
-  if (httpMethod === 'GET' && path === '/purchases') {
+  // GET /purchases or / - List all purchases or filter by orderId/ingredientId
+  if (httpMethod === 'GET' && (path === '/purchases' || path === '/')) {
     try {
       const orderId = queryStringParameters?.orderId;
       const ingredientId = queryStringParameters?.ingredientId;
@@ -90,8 +90,8 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
     }
   }
 
-  // GET /purchases/stats - Get purchase statistics
-  if (httpMethod === 'GET' && path === '/purchases/stats') {
+  // GET /purchases/stats or /stats - Get purchase statistics
+  if (httpMethod === 'GET' && (path === '/purchases/stats' || path === '/stats')) {
     try {
       const stats = await purchaseHistoryRepository.getStats();
       return {

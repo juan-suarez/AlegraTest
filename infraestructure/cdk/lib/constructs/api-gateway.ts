@@ -6,6 +6,8 @@ import { Construct } from 'constructs';
 
 export interface ApiGatewayProps {
   orderServiceLambda: lambda.Function;
+  inventoryServiceLambda: lambda.Function;
+  purchasingServiceLambda: lambda.Function;
 }
 
 export interface ApiGatewayOutput {
@@ -73,34 +75,113 @@ export class ApiGatewayConstruct extends Construct {
     // Associate API Key with Usage Plan
     usagePlan.addApiKey(apiKey);
 
-    // Create root resource proxy for all HTTP methods
-    // This allows the Order Service Lambda to handle all routes
-    const resource = restApi.root.addResource('{proxy+}');
-
-    // Integrate with Lambda using proxy integration - REQUIRE API KEY
-    resource.addMethod(
-      'ANY',
+    // ========================================
+    // ORDER SERVICE - Proxy for all orders routes
+    // ========================================
+    const ordersResource = restApi.root.addResource('orders');
+    ordersResource.addMethod(
+      'GET',
       new apigateway.LambdaIntegration(props.orderServiceLambda, {
         proxy: true,
       }),
       {
-        apiKeyRequired: true,  // Require API Key
+        apiKeyRequired: true,
       }
     );
 
-    // Also add integration for root path - REQUIRE API KEY
-    restApi.root.addMethod(
-      'ANY',
+    ordersResource.addMethod(
+      'POST',
       new apigateway.LambdaIntegration(props.orderServiceLambda, {
         proxy: true,
       }),
       {
-        apiKeyRequired: true,  // Require API Key
+        apiKeyRequired: true,
       }
     );
 
-    // Lambda permissions to be invoked by API Gateway
-    props.orderServiceLambda.addPermission('ApiGatewayInvoke', {
+    // ========================================
+    // INVENTORY SERVICE - Inventory endpoints
+    // ========================================
+    const inventoryResource = restApi.root.addResource('inventory');
+
+    // GET /inventory/ingredients
+    const ingredientsResource = inventoryResource.addResource('ingredients');
+    ingredientsResource.addMethod(
+      'GET',
+      new apigateway.LambdaIntegration(props.inventoryServiceLambda, {
+        proxy: true,
+      }),
+      {
+        apiKeyRequired: true,
+      }
+    );
+
+    // GET /inventory/ingredients/{ingredientId}
+    const ingredientIdResource = ingredientsResource.addResource('{ingredientId}');
+    ingredientIdResource.addMethod(
+      'GET',
+      new apigateway.LambdaIntegration(props.inventoryServiceLambda, {
+        proxy: true,
+      }),
+      {
+        apiKeyRequired: true,
+      }
+    );
+
+    // GET /inventory/reservations
+    const reservationsResource = inventoryResource.addResource('reservations');
+    reservationsResource.addMethod(
+      'GET',
+      new apigateway.LambdaIntegration(props.inventoryServiceLambda, {
+        proxy: true,
+      }),
+      {
+        apiKeyRequired: true,
+      }
+    );
+
+    // ========================================
+    // PURCHASING SERVICE - Purchases endpoints
+    // ========================================
+    const purchasesResource = restApi.root.addResource('purchases');
+
+    // GET /purchases
+    purchasesResource.addMethod(
+      'GET',
+      new apigateway.LambdaIntegration(props.purchasingServiceLambda, {
+        proxy: true,
+      }),
+      {
+        apiKeyRequired: true,
+      }
+    );
+
+    // GET /purchases/stats
+    const statsResource = purchasesResource.addResource('stats');
+    statsResource.addMethod(
+      'GET',
+      new apigateway.LambdaIntegration(props.purchasingServiceLambda, {
+        proxy: true,
+      }),
+      {
+        apiKeyRequired: true,
+      }
+    );
+
+    // Grant Lambda permissions
+    props.orderServiceLambda.addPermission('ApiGatewayInvokeOrders', {
+      principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+      action: 'lambda:InvokeFunction',
+      sourceArn: `arn:aws:execute-api:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:${restApi.restApiId}/*/*`,
+    });
+
+    props.inventoryServiceLambda.addPermission('ApiGatewayInvokeInventory', {
+      principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
+      action: 'lambda:InvokeFunction',
+      sourceArn: `arn:aws:execute-api:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:${restApi.restApiId}/*/*`,
+    });
+
+    props.purchasingServiceLambda.addPermission('ApiGatewayInvokePurchasing', {
       principal: new iam.ServicePrincipal('apigateway.amazonaws.com'),
       action: 'lambda:InvokeFunction',
       sourceArn: `arn:aws:execute-api:${cdk.Stack.of(this).region}:${cdk.Stack.of(this).account}:${restApi.restApiId}/*/*`,

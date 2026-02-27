@@ -49,10 +49,13 @@ async function initializeOnColdStart() {
 async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> {
   const { httpMethod, path, queryStringParameters } = event;
 
-  console.log(`📥 API Gateway: ${httpMethod} ${path}`);
+  console.log(`📥 API Gateway: ${httpMethod} ${path}`, JSON.stringify(event));
+
+  // Normalize path - remove /inventory prefix if present
+  const normalizedPath = path.replace(/^\/inventory/, '') || '/';
 
   // Health check
-  if (httpMethod === 'GET' && path === '/health') {
+  if (httpMethod === 'GET' && (path === '/health' || normalizedPath === '/health')) {
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
@@ -60,8 +63,8 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
     };
   }
 
-  // GET /inventory/ingredients - List all ingredients
-  if (httpMethod === 'GET' && path === '/inventory/ingredients') {
+  // GET /ingredients - List all ingredients
+  if (httpMethod === 'GET' && normalizedPath === '/ingredients') {
     try {
       const ingredients = await ingredientRepository.getAll();
       return {
@@ -79,8 +82,8 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
     }
   }
 
-  // GET /inventory/ingredients/:id - Get single ingredient
-  const ingredientIdMatch = path.match(/^\/inventory\/ingredients\/([a-f0-9-]+)$/i);
+  // GET /ingredients/:id - Get single ingredient
+  const ingredientIdMatch = normalizedPath.match(/^\/ingredients\/([a-f0-9-]+)$/i);
   if (httpMethod === 'GET' && ingredientIdMatch) {
     try {
       const ingredientId = ingredientIdMatch[1]!;
@@ -109,8 +112,8 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
     }
   }
 
-  // GET /inventory/reservations - List all active reservations
-  if (httpMethod === 'GET' && path === '/inventory/reservations') {
+  // GET /reservations - List all active reservations
+  if (httpMethod === 'GET' && normalizedPath === '/reservations') {
     try {
       const orderId = queryStringParameters?.orderId;
 
