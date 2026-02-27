@@ -15,7 +15,7 @@
   display: inline-block;
 }
 
-.placeholder {
+.no-inventory {
   text-align: center;
   padding: 2rem;
   background: linear-gradient(135deg, #e8f4f8 0%, #f0f8fb 100%);
@@ -24,15 +24,56 @@
   color: #555;
 }
 
-.placeholder p {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 500;
+.inventory-table {
+  overflow-x: auto;
+  margin-top: 1rem;
 }
 
-.placeholder .subtitle {
-  font-size: 0.9rem;
-  color: #999;
-  margin-top: 0.5rem;
-  font-weight: normal;
+.inventory-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
 }
+
+.inventory-table thead {
+  background-color: #f8f9fa;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.inventory-table th {
+  padding: 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  color: #495057;
+  white-space: nowrap;
+}
+
+.inventory-table tbody tr {
+  border-bottom: 1px solid #dee2e6;
+  transition: background-color 0.2s;
+}
+
+.inventory-table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+.inventory-table td {
+  padding: 0.75rem;
+}
+
+.ingredient-name {
+  font-weight: 500;
+  color: #333;
+}
+
+.quantity {
+  font-weight: 600;
+  color: #17a2b8;
+  text-align: center;
+}
+
+.timestamp {
+  color: #999;
+  font-size: 0.85rem;
+}
+

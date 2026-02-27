@@ -8,6 +8,7 @@ export interface ApiGatewayProps {
   orderServiceLambda: lambda.Function;
   inventoryServiceLambda: lambda.Function;
   purchasingServiceLambda: lambda.Function;
+  apiKeyValue: string;
 }
 
 export interface ApiGatewayOutput {
@@ -42,14 +43,34 @@ export class ApiGatewayConstruct extends Construct {
           'x-api-key',
           'X-Amz-Security-Token',
         ],
+        allowCredentials: false,
+      },
+    });
+
+    // Add CORS headers to all gateway responses
+    restApi.addGatewayResponse('Cors4xx', {
+      type: apigateway.ResponseType.DEFAULT_4XX,
+      responseHeaders: {
+        'Access-Control-Allow-Origin': "'*'",
+        'Access-Control-Allow-Headers': "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-api-key,X-Amz-Security-Token'",
+        'Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS'",
+      },
+    });
+
+    restApi.addGatewayResponse('Cors5xx', {
+      type: apigateway.ResponseType.DEFAULT_5XX,
+      responseHeaders: {
+        'Access-Control-Allow-Origin': "'*'",
+        'Access-Control-Allow-Headers': "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-api-key,X-Amz-Security-Token'",
+        'Access-Control-Allow-Methods': "'GET,POST,PUT,DELETE,OPTIONS'",
       },
     });
 
     // Create API Key
     const apiKey = new apigateway.ApiKey(this, 'RestaurantApiKey', {
-      apiKeyName: 'restaurant-api-key',
       description: 'API Key for Restaurant Service',
       enabled: true,
+      value: props.apiKeyValue,
     });
 
     // Create Usage Plan with rate limiting and quotas
@@ -57,11 +78,11 @@ export class ApiGatewayConstruct extends Construct {
       name: 'restaurant-usage-plan',
       description: 'Usage plan for Restaurant API',
       throttle: {
-        rateLimit: 100,       // 100 requests per second
-        burstLimit: 200,      // Burst capacity
+        rateLimit: 1000,       // 1000 requests per second
+        burstLimit: 2000,      // Burst capacity
       },
       quota: {
-        limit: 10000,         // 10,000 requests per day
+        limit: 30000,          // 30,000 requests per day (free tier safe)
         period: apigateway.Period.DAY,
       },
       apiStages: [

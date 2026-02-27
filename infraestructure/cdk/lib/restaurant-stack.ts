@@ -4,10 +4,13 @@ import { DatabaseConstruct } from './constructs/database';
 import { EventBusConstruct } from './constructs/event-bus';
 import { LambdaServicesConstruct } from './constructs/lambda-services';
 import { ApiGatewayConstruct } from './constructs/api-gateway';
+import { FrontendConstruct } from './constructs/frontend';
 
 export class RestaurantStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
+
+    const frontendProxyApiKey = process.env.FRONTEND_PROXY_API_KEY || 'restaurant-frontend-proxy-key-v1-change-me';
 
     // ============================================================
     // 1. Create Database (RDS PostgreSQL)
@@ -40,6 +43,15 @@ export class RestaurantStack extends cdk.Stack {
       orderServiceLambda: lambdaServices.output.orderServiceLambda,
       inventoryServiceLambda: lambdaServices.output.inventoryServiceLambda,
       purchasingServiceLambda: lambdaServices.output.purchasingServiceLambda,
+      apiKeyValue: frontendProxyApiKey,
+    });
+
+    // ============================================================
+    // 5. Create Frontend (S3 + CloudFront)
+    // ============================================================
+    const frontend = new FrontendConstruct(this, 'Frontend', {
+      restApi: apiGateway.output.restApi,
+      apiKeyValue: frontendProxyApiKey,
     });
 
     // ============================================================
@@ -59,6 +71,18 @@ export class RestaurantStack extends cdk.Stack {
       value: apiGateway.output.endpoint,
       description: 'Restaurant API Endpoint (Order Service)',
       exportName: 'RestaurantApiEndpoint',
+    });
+
+    new cdk.CfnOutput(this, 'FrontendUrl', {
+      value: `https://${frontend.output.distributionUrl}`,
+      description: 'Frontend Application URL (CloudFront)',
+      exportName: 'RestaurantFrontendUrl',
+    });
+
+    new cdk.CfnOutput(this, 'FrontendBucket', {
+      value: frontend.output.bucketName,
+      description: 'S3 Bucket for Frontend Assets',
+      exportName: 'RestaurantFrontendBucket',
     });
 
     new cdk.CfnOutput(this, 'DatabaseHost', {

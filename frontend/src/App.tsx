@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import './App.css';
-import type { Order } from './types';
+import type { Order, InventoryItem, PurchaseHistory, PurchaseStats } from './types';
 import { orderService } from './services/orderService';
 import { RECIPES } from './data/recipes';
 import { OrderCreation } from './components/OrderCreation';
@@ -12,6 +12,9 @@ import { MarketPurchases } from './components/MarketPurchases';
 
 function App() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [purchases, setPurchases] = useState<PurchaseHistory[]>([]);
+  const [purchaseStats, setPurchaseStats] = useState<PurchaseStats | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -34,21 +37,41 @@ function App() {
       }
     };
 
-    // Verificar si tenemos API configurada
-    const hasApiConfig = import.meta.env.VITE_API_ENDPOINT && 
-                         import.meta.env.VITE_API_KEY && 
-                         import.meta.env.VITE_API_KEY !== 'your_api_key_here';
+    // Polling para inventario
+    const fetchInventory = async () => {
+      try {
+        const data = await orderService.getInventory();
+        setInventory(data);
+      } catch (err) {
+        console.error('Error fetching inventory:', err);
+      }
+    };
 
-    if (!hasApiConfig) {
-      setError('Configura las variables de entorno en .env.local (VITE_API_ENDPOINT y VITE_API_KEY)');
-      return;
-    }
+    // Polling para compras
+    const fetchPurchases = async () => {
+      try {
+        const [purchases, stats] = await Promise.all([
+          orderService.getPurchases(),
+          orderService.getPurchaseStats(),
+        ]);
+        setPurchases(purchases);
+        setPurchaseStats(stats);
+      } catch (err) {
+        console.error('Error fetching purchases:', err);
+      }
+    };
 
     // Fetch inicial
     fetchOrders();
+    fetchInventory();
+    fetchPurchases();
 
     // Setup polling
-    const interval = setInterval(fetchOrders, pollingInterval);
+    const interval = setInterval(() => {
+      fetchOrders();
+      fetchInventory();
+      fetchPurchases();
+    }, pollingInterval);
 
     return () => clearInterval(interval);
   }, [pollingInterval]);
@@ -138,11 +161,11 @@ function App() {
             </div>
 
             <div className="dashboard-section">
-              <Inventory />
+              <Inventory inventory={inventory} />
             </div>
 
             <div className="dashboard-section">
-              <MarketPurchases />
+              <MarketPurchases purchases={purchases} stats={purchaseStats} />
             </div>
 
             <div className="dashboard-section full-width">

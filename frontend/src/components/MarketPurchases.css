@@ -15,7 +15,48 @@
   display: inline-block;
 }
 
-.placeholder {
+.purchase-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.stat-card {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  padding: 1.5rem;
+  border-radius: 10px;
+  border-left: 4px solid #17a2b8;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.stat-card.completed {
+  border-left-color: #28a745;
+}
+
+.stat-card.failed {
+  border-left-color: #dc3545;
+}
+
+.stat-card.total {
+  border-left-color: #ffc107;
+}
+
+.stat-label {
+  font-size: 0.85rem;
+  color: #666;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #333;
+}
+
+.no-purchases {
   text-align: center;
   padding: 2rem;
   background: linear-gradient(135deg, #fff9e6 0%, #fffbf0 100%);
@@ -24,15 +65,77 @@
   color: #555;
 }
 
-.placeholder p {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 500;
+.purchases-table {
+  overflow-x: auto;
+  margin-top: 1rem;
 }
 
-.placeholder .subtitle {
-  font-size: 0.9rem;
+.purchases-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.purchases-table thead {
+  background-color: #f8f9fa;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.purchases-table th {
+  padding: 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  color: #495057;
+  white-space: nowrap;
+}
+
+.purchases-table tbody tr {
+  border-bottom: 1px solid #dee2e6;
+  transition: background-color 0.2s;
+}
+
+.purchases-table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+.purchases-table td {
+  padding: 0.75rem;
+}
+
+.ingredient-name {
+  font-weight: 500;
+  color: #333;
+}
+
+.quantity-cell {
+  text-align: center;
+  font-weight: 500;
+  color: #555;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  text-align: center;
+  min-width: 100px;
+}
+
+.status-badge.completed {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.status-badge.failed {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.timestamp {
   color: #999;
-  margin-top: 0.5rem;
-  font-weight: normal;
+  font-size: 0.85rem;
 }

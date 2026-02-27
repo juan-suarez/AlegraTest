@@ -4,6 +4,14 @@ import { EventBusLocal, EventRouter } from './infrastructure/messaging';
 import { EventEnvelope } from './infrastructure/messaging/types';
 import { IngredientRepository, ReservationRepository } from './repositories';
 
+// CORS Headers
+const CORS_HEADERS = {
+  'Content-Type': 'application/json',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-api-key,X-Amz-Security-Token',
+  'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+};
+
 // Singleton instances (initialized on cold start)
 let isInitialized = false;
 let ingredientRepository: IngredientRepository;
@@ -58,7 +66,7 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
   if (httpMethod === 'GET' && (path === '/health' || normalizedPath === '/health')) {
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: CORS_HEADERS,
       body: JSON.stringify({ status: 'healthy', service: 'inventory-service' }),
     };
   }
@@ -69,14 +77,14 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
       const ingredients = await ingredientRepository.getAll();
       return {
         statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
+        headers: CORS_HEADERS,
         body: JSON.stringify(ingredients),
       };
     } catch (error) {
       console.error('Error fetching ingredients:', error);
       return {
         statusCode: 500,
-        headers: { 'Content-Type': 'application/json' },
+        headers: CORS_HEADERS,
         body: JSON.stringify({ error: 'Internal server error' }),
       };
     }
@@ -92,21 +100,21 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
       if (!ingredient) {
         return {
           statusCode: 404,
-          headers: { 'Content-Type': 'application/json' },
+          headers: CORS_HEADERS,
           body: JSON.stringify({ error: 'Ingredient not found' }),
         };
       }
 
       return {
         statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
+        headers: CORS_HEADERS,
         body: JSON.stringify(ingredient),
       };
     } catch (error) {
       console.error('Error fetching ingredient:', error);
       return {
         statusCode: 500,
-        headers: { 'Content-Type': 'application/json' },
+        headers: CORS_HEADERS,
         body: JSON.stringify({ error: 'Internal server error' }),
       };
     }
@@ -122,7 +130,7 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
         const reservations = await reservationRepository.getByOrder(orderId);
         return {
           statusCode: 200,
-          headers: { 'Content-Type': 'application/json' },
+          headers: CORS_HEADERS,
           body: JSON.stringify(reservations),
         };
       } else {
@@ -130,7 +138,7 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
         const reservations = await reservationRepository.getAllActive();
         return {
           statusCode: 200,
-          headers: { 'Content-Type': 'application/json' },
+          headers: CORS_HEADERS,
           body: JSON.stringify(reservations),
         };
       }
@@ -138,7 +146,7 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
       console.error('Error fetching reservations:', error);
       return {
         statusCode: 500,
-        headers: { 'Content-Type': 'application/json' },
+        headers: CORS_HEADERS,
         body: JSON.stringify({ error: 'Internal server error' }),
       };
     }
@@ -147,7 +155,7 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
   // Not found
   return {
     statusCode: 404,
-    headers: { 'Content-Type': 'application/json' },
+    headers: CORS_HEADERS,
     body: JSON.stringify({ error: 'Not found' }),
   };
 }
@@ -221,7 +229,7 @@ export async function handler(
     console.error('Lambda error:', error);
     return {
       statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: CORS_HEADERS,
       body: JSON.stringify({
         error: 'Internal server error',
         message: error instanceof Error ? error.message : 'Unknown error',
