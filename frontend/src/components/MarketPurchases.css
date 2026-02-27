@@ -1,0 +1,38 @@
+.market-purchases {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin-bottom: 2rem;
+}
+
+.market-purchases h3 {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.4rem;
+  color: #333;
+  padding-bottom: 0.5rem;
+  border-bottom: 3px solid #ffc107;
+  display: inline-block;
+}
+
+.placeholder {
+  text-align: center;
+  padding: 2rem;
+  background: linear-gradient(135deg, #fff9e6 0%, #fffbf0 100%);
+  border-radius: 8px;
+  border: 2px dashed #ffc107;
+  color: #555;
+}
+
+.placeholder p {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.placeholder .subtitle {
+  font-size: 0.9rem;
+  color: #999;
+  margin-top: 0.5rem;
+  font-weight: normal;
+}
