@@ -1,6 +1,7 @@
-import { Context, APIGatewayProxyEvent, SQSEvent } from 'aws-lambda';
+import { Context, APIGatewayProxyEvent, SQSEvent, SQSRecord } from 'aws-lambda';
 import pool from './db/connection';
-import { EventBusLocal } from './infrastructure/messaging';
+import { EventBusLocal, EventRouter } from './infrastructure/messaging';
+import { EventEnvelope } from './infrastructure/messaging/types';
 import { OrderRepository } from './repositories/OrderRepository';
 import { CreateOrderUseCase } from './use-cases/CreateOrderUseCase';
 
@@ -9,6 +10,7 @@ let isInitialized = false;
 let orderRepository: OrderRepository;
 let createOrderUseCase: CreateOrderUseCase;
 let eventBusInstance: EventBusLocal;
+let eventRouter: EventRouter;
 
 async function initializeOnColdStart() {
   if (isInitialized) return;
@@ -36,6 +38,9 @@ async function initializeOnColdStart() {
   // Initialize repository and use cases
   orderRepository = new OrderRepository(pool);
   createOrderUseCase = new CreateOrderUseCase(orderRepository, eventBusInstance);
+  
+  // Initialize event router for consuming SQS events
+  eventRouter = new EventRouter(pool);
 
   isInitialized = true;
   console.log('✅ Lambda initialized successfully');
@@ -100,11 +105,38 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
         };
       }
 
+      // Validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(input.orderId)) {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            error: 'Validation failed',
+            details: [`orderId must be a valid UUID (received: ${input.orderId})`],
+          }),
+        };
+      }
+
+      // Validate totalDishes is a positive number
+      if (!Number.isInteger(input.totalDishes) || input.totalDishes <= 0) {
+        return {
+          statusCode: 400,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            error: 'Validation failed',
+            details: ['totalDishes must be a positive integer'],
+          }),
+        };
+      }
+
       // Execute use case
       const result = await createOrderUseCase.execute({
         orderId: input.orderId,
         totalDishes: input.totalDishes,
       });
+
+      console.log(`✅ Order processed successfully`, { orderId: result.orderId, eventId: result.eventId });
 
       return {
         statusCode: 201,
@@ -112,7 +144,7 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
         body: JSON.stringify({ success: true, data: result }),
       };
     } catch (error: any) {
-      console.error('Error creating order:', error);
+      console.error('❌ Error creating order:', error);
       return {
         statusCode: 500,
         headers: { 'Content-Type': 'application/json' },
@@ -131,8 +163,43 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
 
 // SQS event handler
 async function handleSQSEvent(event: SQSEvent): Promise<void> {
-  console.log(`📥 SQS: Processing ${event.Records.length} messages`);
-  await eventBusInstance.processSQSBatch(event.Records);
+  console.log(`📥 Received ${event.Records.length} SQS message(s)`);
+
+  for (const record of event.Records) {
+    try {
+      await processSQSRecord(record);
+    } catch (error) {
+      console.error('❌ Error processing SQS record:', error);
+      throw error; // Throw to trigger retry or DLQ
+    }
+  }
+}
+
+async function processSQSRecord(record: SQSRecord): Promise<void> {
+  try {
+    // Parse SNS message from SQS
+    const snsMessage = JSON.parse(record.body);
+    
+    // The actual event is in the Message field
+    const eventEnvelope: EventEnvelope = JSON.parse(snsMessage.Message);
+    
+    console.log(`📨 Processing event: ${eventEnvelope.eventType}`, {
+      eventId: eventEnvelope.eventId,
+      source: eventEnvelope.source,
+    });
+
+    // Route event to appropriate handler
+    const handler = eventRouter.getHandler();
+    await handler(eventEnvelope);
+
+    console.log(`✅ Event processed successfully: ${eventEnvelope.eventType}`);
+  } catch (error) {
+    console.error('❌ Error processing SQS record:', {
+      messageId: record.messageId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
 }
 
 // Main Lambda handler
