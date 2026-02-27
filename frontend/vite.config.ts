@@ -9,7 +9,7 @@ export default defineConfig({
     host: '0.0.0.0',
     strictPort: false,
     proxy: {
-      '/prod/orders': {
+      '/prod': {
         target: 'https://zk8g7otl92.execute-api.us-east-1.amazonaws.com',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/prod/, '/prod'),

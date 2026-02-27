@@ -33,11 +33,38 @@ export interface Ingredient {
 
 export interface InventoryItem {
   id: string;
-  ingredientId: string;
   name: string;
   quantity: number;
   unit: string;
-  lastUpdated: string;
+  location?: string;
+  created_at: string;
+}
+
+export interface Reservation {
+  id: string;
+  order_id: string;
+  ingredient_id: string;
+  quantity_requested: number;
+  quantity_reserved: number;
+  status: string;
+  created_at: string;
+}
+
+export interface PurchaseHistory {
+  id: string;
+  order_id: string;
+  ingredient_id: string;
+  ingredient_name: string;
+  quantity_requested: number;
+  quantity_purchased: number;
+  status: 'COMPLETED' | 'FAILED';
+  created_at: string;
+}
+
+export interface PurchaseStats {
+  totalPurchases: number;
+  completedPurchases: number;
+  failedPurchases: number;
 }
 
 export interface MarketPurchase {
