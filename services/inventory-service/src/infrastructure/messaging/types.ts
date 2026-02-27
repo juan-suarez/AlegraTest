@@ -4,9 +4,10 @@
 
 export interface EventBusConfig {
   region: string;
+  accountId?: string; // AWS Account ID for SNS topic ARN (defaults to fake account for LocalStack)
   endpoint?: string;
-  accessKeyId: string;
-  secretAccessKey: string;
+  accessKeyId?: string;
+  secretAccessKey?: string;
   queueUrl: string;
   pollingIntervalMs: number;
 }

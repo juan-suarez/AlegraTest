@@ -1,13 +1,33 @@
-# 🍽️ Restaurant Event-Driven System - Infraestructure
+# 🍽️ Restaurant Event-Driven System - Infrastructure
 
-## Descripción
+## 📁 Structure
 
-Este directorio contiene toda la infraestructura para el sistema de restaurante event-driven:
+This directory contains the complete infrastructure for the restaurant event-driven system, organized into **local development** and **AWS production** environments:
 
-- **postgres/**: Scripts de inicialización de base de datos
-- **localstack/**: Scripts para configurar SNS/SQS en LocalStack
-- **e2e-tests/**: Tests end-to-end automatizados
-- **scripts/**: Utilidades para levantar servicios
+```
+infraestructure/
+├── local/              # Local development with Docker Compose
+│   ├── e2e-tests/      # End-to-end automated tests
+│   ├── localstack/     # AWS emulation (SNS/SQS)
+│   ├── postgres/       # PostgreSQL initialization scripts
+│   └── scripts/        # Helper scripts for local services
+│
+├── cdk/                # AWS Cloud Development Kit (Production)
+│   └── (To be created)
+│
+└── README.md           # This file
+```
+
+---
+
+## 🏠 Local Development
+
+For **local development**, all infrastructure runs via Docker Compose using:
+- **LocalStack**: AWS services emulation (SNS/SQS)
+- **PostgreSQL**: Single instance with 4 databases
+- **4 Microservices**: Running as Docker containers
+
+See [local/README.md](local/README.md) for detailed local development documentation.
 
 ---
 
@@ -492,17 +512,26 @@ CDK:
 
 ---
 
-# 12. Entorno Local
+# 12. Infrastructure Organization
 
-Para pruebas locales se usará:
+## Local Development (`local/`)
+For local development and testing:
+- **LocalStack**: Simulates SNS/SQS
+- **Docker Compose**: Runs all services
+- **PostgreSQL**: Single local instance
 
-- LocalStack para simular:
-  - SNS
-  - SQS
-- Docker para ejecutar servicios
-- PostgreSQL local
+See [local/README.md](local/README.md) for complete local setup.
 
-La infraestructura cloud se define únicamente en este directorio.
+## AWS Production (`cdk/`)
+For production deployment:
+- **AWS CDK**: Infrastructure as Code
+- **Lambda**: Serverless compute for all services
+- **RDS PostgreSQL**: Managed database
+- **SNS/SQS**: Real AWS event bus
+- **API Gateway**: HTTP endpoint for Order Service
+- **100% Free Tier**: Optimized for AWS Free Tier
+
+The `cdk/` directory will contain all production infrastructure code.
 
 ---
 

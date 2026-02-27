@@ -13,18 +13,25 @@ export class EventBusLocal {
   private sqsClient: SQSClient;
   private config: EventBusConfig;
   private running: boolean = false;
+  private handler: MessageHandler | undefined;
 
-  constructor(config: EventBusConfig) {
+  constructor(config: EventBusConfig, handler?: MessageHandler) {
     this.config = config;
+    this.handler = handler;
 
-    const clientConfig = {
+    const clientConfig: any = {
       region: config.region,
-      credentials: {
-        accessKeyId: config.accessKeyId,
-        secretAccessKey: config.secretAccessKey,
-      },
       ...(config.endpoint && { endpoint: config.endpoint }),
     };
+
+    // Only add credentials if they are provided and not empty
+    if (config.accessKeyId && config.secretAccessKey) {
+      clientConfig.credentials = {
+        accessKeyId: config.accessKeyId,
+        secretAccessKey: config.secretAccessKey,
+      };
+    }
+    // Otherwise, AWS SDK will use default credential resolution (IAM role in Lambda)
 
     this.snsClient = new SNSClient(clientConfig);
     this.sqsClient = new SQSClient(clientConfig);
@@ -42,7 +49,8 @@ export class EventBusLocal {
       data,
     };
 
-    const topicArn = `arn:aws:sns:${this.config.region}:000000000000:${topicName}`;
+    const accountId = this.config.accountId || '000000000000'; // Use real account ID if provided, else fake for LocalStack
+    const topicArn = `arn:aws:sns:${this.config.region}:${accountId}:${topicName}`;
 
     const command = new PublishCommand({
       TopicArn: topicArn,
@@ -68,7 +76,18 @@ export class EventBusLocal {
   /**
    * Inicia el consumo de mensajes desde SQS (polling)
    */
-  async startConsuming(handler: MessageHandler): Promise<void> {
+  async startConsuming(handler?: MessageHandler): Promise<void> {
+    // Skip in Lambda environment
+    if (process.env.AWS_EXECUTION_ENV) {
+      console.log('⚠️  startConsuming() skipped - running in Lambda environment');
+      return;
+    }
+
+    const messageHandler = handler || this.handler;
+    if (!messageHandler) {
+      throw new Error('No handler provided for SQS consuming');
+    }
+
     console.log(`🚀 Starting SQS consumer for queue: ${this.config.queueUrl}`);
     console.log(`⏱️  Polling interval: ${this.config.pollingIntervalMs}ms`);
     
@@ -82,7 +101,7 @@ export class EventBusLocal {
           console.log(`📬 Received ${messages.length} message(s)`);
           
           for (const message of messages) {
-            await this.processMessage(message, handler);
+            await this.processMessage(message, messageHandler);
           }
         }
 
@@ -184,6 +203,30 @@ export class EventBusLocal {
     });
 
     await this.sqsClient.send(command);
+  }
+
+  /**
+   * Process SQS batch - for Lambda event source mapping
+   */
+  async processSQSBatch(records: any[]): Promise<void> {
+    if (!this.handler) {
+      throw new Error('No handler defined for processSQSBatch');
+    }
+
+    for (const record of records) {
+      try {
+        // SNS wraps message in Body
+        const body = JSON.parse(record.body);
+        const envelope: EventEnvelope = body.Message ? JSON.parse(body.Message) : body;
+        
+        console.log(`[${new Date().toISOString()}] Processing SQS message: ${envelope.eventType}`);
+        await this.handler(envelope);
+      } catch (error) {
+        console.error(`Error processing SQS record:`, error);
+        // Re-throw to trigger Lambda retry
+        throw error;
+      }
+    }
   }
 
   /**

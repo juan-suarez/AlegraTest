@@ -15,14 +15,22 @@ let eventBus: EventBusLocal | null = null;
 let httpServer: http.Server | null = null;
 
 function createEventBusInstance(): EventBusLocal {
-  return new EventBusLocal({
+  const config: any = {
     region: process.env.AWS_REGION || 'us-east-1',
-    endpoint: process.env.AWS_ENDPOINT || 'http://localhost:4566',
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || 'test',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || 'test',
+    accountId: process.env.AWS_ACCOUNT_ID,
     queueUrl: process.env.SQS_QUEUE_URL!,
     pollingIntervalMs: parseInt(process.env.POLLING_INTERVAL_MS || '10000'),
-  });
+  };
+
+  // Only use LocalStack endpoint in local development
+  if (process.env.AWS_ENDPOINT && process.env.AWS_ENDPOINT.includes('localhost')) {
+    config.endpoint = process.env.AWS_ENDPOINT;
+    config.accessKeyId = process.env.AWS_ACCESS_KEY_ID || 'test';
+    config.secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY || 'test';
+  }
+  // In Lambda/AWS, credentials come from IAM role (not passed explicitly)
+
+  return new EventBusLocal(config);
 }
 
 async function initializeDatabase() {
