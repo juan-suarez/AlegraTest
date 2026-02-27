@@ -1,0 +1,84 @@
+.order-creation {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 2rem;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  margin-bottom: 2rem;
+  color: white;
+}
+
+.order-creation h2 {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.8rem;
+  font-weight: 600;
+}
+
+.order-creation form {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+.form-group input {
+  padding: 0.75rem;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  font-size: 1rem;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  min-width: 120px;
+  transition: all 0.3s ease;
+}
+
+.form-group input:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.form-group input:focus {
+  outline: none;
+  background: rgba(255, 255, 255, 0.2);
+  border-color: white;
+}
+
+.form-group input::placeholder {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.create-button {
+  padding: 0.75rem 2rem;
+  background: white;
+  color: #667eea;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.create-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+.create-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.create-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
