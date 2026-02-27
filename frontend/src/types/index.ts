@@ -34,10 +34,9 @@ export interface Ingredient {
 export interface InventoryItem {
   id: string;
   name: string;
-  quantity: number;
-  unit: string;
-  location?: string;
+  stock: number;
   created_at: string;
+  updated_at?: string;
 }
 
 export interface Reservation {

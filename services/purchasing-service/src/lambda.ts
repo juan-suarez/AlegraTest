@@ -4,6 +4,14 @@ import { EventBusLocal, EventRouter } from './infrastructure/messaging';
 import { EventEnvelope } from './infrastructure/messaging/types';
 import { PurchaseHistoryRepository } from './repositories';
 
+// CORS Headers
+const CORS_HEADERS = {
+  'Content-Type': 'application/json',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-api-key,X-Amz-Security-Token',
+  'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+};
+
 // Singleton instances (initialized on cold start)
 let isInitialized = false;
 let purchaseHistoryRepository: PurchaseHistoryRepository;
@@ -53,7 +61,7 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
   if (httpMethod === 'GET' && path === '/health') {
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: CORS_HEADERS,
       body: JSON.stringify({ status: 'healthy', service: 'purchasing-service' }),
     };
   }
@@ -77,14 +85,14 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
 
       return {
         statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
+        headers: CORS_HEADERS,
         body: JSON.stringify(purchases),
       };
     } catch (error) {
       console.error('Error fetching purchases:', error);
       return {
         statusCode: 500,
-        headers: { 'Content-Type': 'application/json' },
+        headers: CORS_HEADERS,
         body: JSON.stringify({ error: 'Internal server error' }),
       };
     }
@@ -96,14 +104,14 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
       const stats = await purchaseHistoryRepository.getStats();
       return {
         statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
+        headers: CORS_HEADERS,
         body: JSON.stringify(stats),
       };
     } catch (error) {
       console.error('Error fetching purchase stats:', error);
       return {
         statusCode: 500,
-        headers: { 'Content-Type': 'application/json' },
+        headers: CORS_HEADERS,
         body: JSON.stringify({ error: 'Internal server error' }),
       };
     }
@@ -112,7 +120,7 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
   // Not found
   return {
     statusCode: 404,
-    headers: { 'Content-Type': 'application/json' },
+    headers: CORS_HEADERS,
     body: JSON.stringify({ error: 'Not found' }),
   };
 }
@@ -187,7 +195,7 @@ export async function handler(
     console.error('Lambda error:', error);
     return {
       statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: CORS_HEADERS,
       body: JSON.stringify({
         error: 'Internal server error',
         message: error instanceof Error ? error.message : 'Unknown error',

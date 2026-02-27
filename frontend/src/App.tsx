@@ -61,16 +61,6 @@ function App() {
       }
     };
 
-    // Verificar si tenemos API configurada
-    const hasApiConfig = import.meta.env.VITE_API_ENDPOINT && 
-                         import.meta.env.VITE_API_KEY && 
-                         import.meta.env.VITE_API_KEY !== 'your_api_key_here';
-
-    if (!hasApiConfig) {
-      setError('Configura las variables de entorno en .env.local (VITE_API_ENDPOINT y VITE_API_KEY)');
-      return;
-    }
-
     // Fetch inicial
     fetchOrders();
     fetchInventory();

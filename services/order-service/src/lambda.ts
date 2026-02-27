@@ -1,4 +1,12 @@
 import { Context, APIGatewayProxyEvent, SQSEvent, SQSRecord } from 'aws-lambda';
+ 
+// CORS Headers
+const CORS_HEADERS = {
+  'Content-Type': 'application/json',
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,x-api-key,X-Amz-Security-Token',
+  'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+};
 import pool from './db/connection';
 import { EventBusLocal, EventRouter } from './infrastructure/messaging';
 import { EventEnvelope } from './infrastructure/messaging/types';
@@ -56,7 +64,7 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
   if (httpMethod === 'GET' && path === '/health') {
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: CORS_HEADERS,
       body: JSON.stringify({ status: 'healthy', service: 'order-service' }),
     };
   }
@@ -67,14 +75,14 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
       const result = await pool.query('SELECT * FROM orders ORDER BY created_at DESC LIMIT 10');
       return {
         statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
+        headers: CORS_HEADERS,
         body: JSON.stringify(result.rows),
       };
     } catch (error) {
       console.error('Error fetching orders:', error);
       return {
         statusCode: 500,
-        headers: { 'Content-Type': 'application/json' },
+        headers: CORS_HEADERS,
         body: JSON.stringify({ error: 'Internal server error' }),
       };
     }
@@ -86,7 +94,7 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
       if (!body) {
         return {
           statusCode: 400,
-          headers: { 'Content-Type': 'application/json' },
+          headers: CORS_HEADERS,
           body: JSON.stringify({ error: 'Missing request body' }),
         };
       }
@@ -97,7 +105,7 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
       if (!input.orderId || !input.totalDishes) {
         return {
           statusCode: 400,
-          headers: { 'Content-Type': 'application/json' },
+          headers: CORS_HEADERS,
           body: JSON.stringify({
             error: 'Validation failed',
             details: ['orderId and totalDishes are required'],
@@ -110,7 +118,7 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
       if (!uuidRegex.test(input.orderId)) {
         return {
           statusCode: 400,
-          headers: { 'Content-Type': 'application/json' },
+          headers: CORS_HEADERS,
           body: JSON.stringify({
             error: 'Validation failed',
             details: [`orderId must be a valid UUID (received: ${input.orderId})`],
@@ -122,7 +130,7 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
       if (!Number.isInteger(input.totalDishes) || input.totalDishes <= 0) {
         return {
           statusCode: 400,
-          headers: { 'Content-Type': 'application/json' },
+          headers: CORS_HEADERS,
           body: JSON.stringify({
             error: 'Validation failed',
             details: ['totalDishes must be a positive integer'],
@@ -140,14 +148,14 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
 
       return {
         statusCode: 201,
-        headers: { 'Content-Type': 'application/json' },
+        headers: CORS_HEADERS,
         body: JSON.stringify({ success: true, data: result }),
       };
     } catch (error: any) {
       console.error('❌ Error creating order:', error);
       return {
         statusCode: 500,
-        headers: { 'Content-Type': 'application/json' },
+        headers: CORS_HEADERS,
         body: JSON.stringify({ error: error.message || 'Internal server error' }),
       };
     }
@@ -156,7 +164,7 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
   // Not found
   return {
     statusCode: 404,
-    headers: { 'Content-Type': 'application/json' },
+    headers: CORS_HEADERS,
     body: JSON.stringify({ error: 'Not found' }),
   };
 }
@@ -231,7 +239,7 @@ export async function handler(
     console.error('Lambda error:', error);
     return {
       statusCode: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: CORS_HEADERS,
       body: JSON.stringify({
         error: 'Internal server error',
         message: error instanceof Error ? error.message : 'Unknown error',

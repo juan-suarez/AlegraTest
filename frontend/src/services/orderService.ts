@@ -1,17 +1,16 @@
 import type { Order, CreateOrderResponse } from '../types';
 
 const isDev = import.meta.env.DEV;
-const API_ENDPOINT = isDev ? '/prod' : import.meta.env.VITE_API_ENDPOINT;
-const API_KEY = import.meta.env.VITE_API_KEY;
+const API_ENDPOINT = isDev ? '/prod' : '';
+const DEV_API_KEY = import.meta.env.VITE_API_KEY;
 
-if (!isDev && (!API_ENDPOINT || !API_KEY)) {
-  console.warn('Missing environment variables: VITE_API_ENDPOINT or VITE_API_KEY');
-}
-
-const headers = {
+const headers: Record<string, string> = {
   'Content-Type': 'application/json',
-  'x-api-key': API_KEY,
 };
+
+if (isDev && DEV_API_KEY) {
+  headers['x-api-key'] = DEV_API_KEY;
+}
 
 export const orderService = {
   // ORDERS
@@ -28,10 +27,6 @@ export const orderService = {
           totalDishes,
         }),
       });
-
-      if (response.status === 403) {
-        throw new Error('Forbidden: Invalid API Key');
-      }
 
       if (!response.ok) {
         throw new Error(`Error ${response.status}: ${response.statusText}`);
@@ -51,10 +46,6 @@ export const orderService = {
         method: 'GET',
         headers,
       });
-
-      if (response.status === 403) {
-        throw new Error('Forbidden: Invalid API Key');
-      }
 
       if (!response.ok) {
         throw new Error(`Error ${response.status}: ${response.statusText}`);
@@ -76,10 +67,6 @@ export const orderService = {
         headers,
       });
 
-      if (response.status === 403) {
-        throw new Error('Forbidden: Invalid API Key');
-      }
-
       if (!response.ok) {
         throw new Error(`Error ${response.status}: ${response.statusText}`);
       }
@@ -98,10 +85,6 @@ export const orderService = {
         method: 'GET',
         headers,
       });
-
-      if (response.status === 403) {
-        throw new Error('Forbidden: Invalid API Key');
-      }
 
       if (!response.ok) {
         throw new Error(`Error ${response.status}: ${response.statusText}`);
@@ -123,10 +106,6 @@ export const orderService = {
         headers,
       });
 
-      if (response.status === 403) {
-        throw new Error('Forbidden: Invalid API Key');
-      }
-
       if (!response.ok) {
         throw new Error(`Error ${response.status}: ${response.statusText}`);
       }
@@ -145,10 +124,6 @@ export const orderService = {
         method: 'GET',
         headers,
       });
-
-      if (response.status === 403) {
-        throw new Error('Forbidden: Invalid API Key');
-      }
 
       if (!response.ok) {
         throw new Error(`Error ${response.status}: ${response.statusText}`);
