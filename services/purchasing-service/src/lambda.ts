@@ -1,10 +1,12 @@
-import { Context, SQSEvent, SQSRecord } from 'aws-lambda';
+import { Context, APIGatewayProxyEvent, SQSEvent, SQSRecord } from 'aws-lambda';
 import pool from './db/connection';
 import { EventBusLocal, EventRouter } from './infrastructure/messaging';
 import { EventEnvelope } from './infrastructure/messaging/types';
+import { PurchaseHistoryRepository } from './repositories';
 
 // Singleton instances (initialized on cold start)
 let isInitialized = false;
+let purchaseHistoryRepository: PurchaseHistoryRepository;
 let eventBusInstance: EventBusLocal;
 let eventRouter: EventRouter;
 
@@ -30,12 +32,89 @@ async function initializeOnColdStart() {
   // In Lambda/AWS, credentials come from IAM role (not passed explicitly)
   
   eventBusInstance = new EventBusLocal(config);
+
+  // Initialize repository
+  purchaseHistoryRepository = new PurchaseHistoryRepository(pool);
   
   // Initialize event router (creates handlers and use cases internally)
   eventRouter = new EventRouter(pool, eventBusInstance);
 
   isInitialized = true;
   console.log('✅ Lambda initialized successfully');
+}
+
+// API Gateway event handler
+async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> {
+  const { httpMethod, path, queryStringParameters } = event;
+
+  console.log(`📥 API Gateway: ${httpMethod} ${path}`, JSON.stringify(event));
+
+  // Health check
+  if (httpMethod === 'GET' && path === '/health') {
+    return {
+      statusCode: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'healthy', service: 'purchasing-service' }),
+    };
+  }
+
+  // GET /purchases or / - List all purchases or filter by orderId/ingredientId
+  if (httpMethod === 'GET' && (path === '/purchases' || path === '/')) {
+    try {
+      const orderId = queryStringParameters?.orderId;
+      const ingredientId = queryStringParameters?.ingredientId;
+      const limit = queryStringParameters?.limit ? parseInt(queryStringParameters.limit, 10) : 50;
+
+      let purchases;
+
+      if (orderId) {
+        purchases = await purchaseHistoryRepository.findByOrderId(orderId);
+      } else if (ingredientId) {
+        purchases = await purchaseHistoryRepository.findByIngredientId(ingredientId);
+      } else {
+        purchases = await purchaseHistoryRepository.findAll(limit);
+      }
+
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(purchases),
+      };
+    } catch (error) {
+      console.error('Error fetching purchases:', error);
+      return {
+        statusCode: 500,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: 'Internal server error' }),
+      };
+    }
+  }
+
+  // GET /purchases/stats or /stats - Get purchase statistics
+  if (httpMethod === 'GET' && (path === '/purchases/stats' || path === '/stats')) {
+    try {
+      const stats = await purchaseHistoryRepository.getStats();
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(stats),
+      };
+    } catch (error) {
+      console.error('Error fetching purchase stats:', error);
+      return {
+        statusCode: 500,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: 'Internal server error' }),
+      };
+    }
+  }
+
+  // Not found
+  return {
+    statusCode: 404,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ error: 'Not found' }),
+  };
 }
 
 // SQS event handler
@@ -80,12 +159,39 @@ async function processSQSRecord(record: SQSRecord): Promise<void> {
 }
 
 // Main Lambda handler
-export async function handler(event: SQSEvent, context?: Context): Promise<void> {
+export async function handler(
+  event: APIGatewayProxyEvent | SQSEvent | any,
+  context?: Context
+): Promise<any> {
   try {
+    // Initialize on cold start
     await initializeOnColdStart();
-    await handleSQSEvent(event);
+
+    // Route to appropriate handler
+    if (event.Records && Array.isArray(event.Records)) {
+      // SQS Event
+      await handleSQSEvent(event as SQSEvent);
+      return { statusCode: 200 };
+    } else if (event.httpMethod && event.path) {
+      // API Gateway Event
+      return await handleApiGatewayEvent(event as APIGatewayProxyEvent);
+    }
+
+    // Unknown event type
+    console.warn('Unknown event type:', event);
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ error: 'Unknown event type' }),
+    };
   } catch (error) {
-    console.error('❌ Lambda handler error:', error);
-    throw error;
+    console.error('Lambda error:', error);
+    return {
+      statusCode: 500,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        error: 'Internal server error',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      }),
+    };
   }
 }

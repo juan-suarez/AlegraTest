@@ -77,6 +77,7 @@ export async function stopTestDatabase(pool: Pool, container: any): Promise<void
 
 export async function cleanDatabase(pool: Pool): Promise<void> {
   try {
+    await pool.query('TRUNCATE TABLE purchase_history CASCADE');
     await pool.query('TRUNCATE TABLE events_processed CASCADE');
   } catch (error) {
     console.error('Error cleaning database:', error);

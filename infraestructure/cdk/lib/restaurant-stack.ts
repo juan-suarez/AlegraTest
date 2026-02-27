@@ -38,6 +38,8 @@ export class RestaurantStack extends cdk.Stack {
     // ============================================================
     const apiGateway = new ApiGatewayConstruct(this, 'ApiGateway', {
       orderServiceLambda: lambdaServices.output.orderServiceLambda,
+      inventoryServiceLambda: lambdaServices.output.inventoryServiceLambda,
+      purchasingServiceLambda: lambdaServices.output.purchasingServiceLambda,
     });
 
     // ============================================================

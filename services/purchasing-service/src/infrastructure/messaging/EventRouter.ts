@@ -1,7 +1,7 @@
 import { EventEnvelope, MessageHandler } from './types';
 import { PurchaseRequestedHandler } from '../../events/handlers';
 import { HandlePurchaseRequestedUseCase } from '../../use-cases';
-import { EventRepository } from '../../repositories';
+import { EventRepository, PurchaseHistoryRepository } from '../../repositories';
 import { ProviderClient } from '../../externals';
 import { Pool } from 'pg';
 import { EventBusLocal } from './EventBusLocal';
@@ -19,10 +19,12 @@ export class EventRouter {
 
   constructor(pool: Pool, eventBus: EventBusLocal) {
     const eventRepo = new EventRepository(pool);
+    const purchaseHistoryRepo = new PurchaseHistoryRepository(pool);
     const providerClient = new ProviderClient();
 
     const handlePurchaseRequestedUseCase = new HandlePurchaseRequestedUseCase(
       eventRepo,
+      purchaseHistoryRepo,
       providerClient,
       eventBus
     );

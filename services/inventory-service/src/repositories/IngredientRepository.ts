@@ -52,4 +52,11 @@ export class IngredientRepository {
     );
     return result.rows[0];
   }
+
+  async getAll(): Promise<Ingredient[]> {
+    const result = await this.pool.query(
+      'SELECT * FROM ingredients ORDER BY name ASC'
+    );
+    return result.rows;
+  }
 }
