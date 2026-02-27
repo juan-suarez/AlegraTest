@@ -1,13 +1,39 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import * as http from 'http';
+import * as dotenv from 'dotenv';
 import pool, { closePool } from './db/connection';
 import { EventBusLocal } from './infrastructure/messaging';
 import { EventRouter } from './infrastructure/messaging/EventRouter';
+import { InventoryController } from './controllers/InventoryController';
+import { IngredientRepository, ReservationRepository } from './repositories';
 
-let eventBus: EventBusLocal;
-let eventRouter: EventRouter;
+// Cargar variables de entorno
+dotenv.config();
 
-async function main() {
+let eventBus: EventBusLocal | null = null;
+let httpServer: http.Server | null = null;
+
+function createEventBusInstance(): EventBusLocal {
+  const config: any = {
+    region: process.env.AWS_REGION || 'us-east-1',
+    accountId: process.env.AWS_ACCOUNT_ID,
+    queueUrl: process.env.SQS_QUEUE_URL!,
+    pollingIntervalMs: parseInt(process.env.POLLING_INTERVAL_MS || '10000'),
+  };
+
+  // Only use LocalStack endpoint in local development
+  if (process.env.AWS_ENDPOINT && process.env.AWS_ENDPOINT.includes('localhost')) {
+    config.endpoint = process.env.AWS_ENDPOINT;
+    config.accessKeyId = process.env.AWS_ACCESS_KEY_ID || 'test';
+    config.secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY || 'test';
+  }
+  // In Lambda/AWS, credentials come from IAM role (not passed explicitly)
+
+  return new EventBusLocal(config);
+}
+
+async function initializeDatabase() {
   console.log('🚀 Inicializando inventory-service...');
 
   try {
@@ -35,62 +61,147 @@ async function main() {
     tablesResult.rows.forEach((row: any) => {
       console.log(`   - ${row.table_name}`);
     });
-
-    // Inicializar EventBus
-    console.log('\n📡 Inicializando EventBus...');
-    const eventBusConfig: any = {
-      region: process.env.AWS_REGION || 'us-east-1',
-      accountId: process.env.AWS_ACCOUNT_ID,
-      queueUrl: process.env.SQS_QUEUE_URL || 'https://sqs.us-east-1.amazonaws.com/000000000000/inventory-service-queue',
-      pollingIntervalMs: parseInt(process.env.POLLING_INTERVAL_MS || '1000', 10),
-    };
-    
-    // Only use LocalStack endpoint in local development
-    if (process.env.AWS_ENDPOINT && process.env.AWS_ENDPOINT.includes('localhost')) {
-      eventBusConfig.endpoint = process.env.AWS_ENDPOINT;
-      eventBusConfig.accessKeyId = process.env.AWS_ACCESS_KEY_ID || 'test';
-      eventBusConfig.secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY || 'test';
-    }
-    // In Lambda/AWS, credentials come from IAM role (not passed explicitly)
-    
-    eventBus = new EventBusLocal(eventBusConfig);
-
-    // Inicializar EventRouter
-    console.log('🔀 Inicializando EventRouter...');
-    eventRouter = new EventRouter(pool, eventBus);
-
-    // Conectar handler
-    const handler = eventRouter.getHandler();
-    eventBus.startConsuming(handler).catch((error) => {
-      console.error("❌ Error en consumer:", error);
-      process.exit(1);
-    });
-    console.log('✅ EventBus escuchando eventos...');
-
-    console.log('\n✨ inventory-service está listo para recibir eventos');
   } catch (error) {
-    console.error('❌ Error al inicializar:', error);
-    process.exit(1);
+    console.error('❌ Error al inicializar base de datos:', error);
+    throw error;
   }
 }
 
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('🛑 Recibido SIGTERM, cerrando gracefully...');
-  if (eventBus) {
-    await eventBus.stop();
-  }
-  await closePool();
-  process.exit(0);
-});
+async function initializeHttpServer(sharedEventBus: EventBusLocal) {
+  console.log('\n🌐 Inicializando HTTP Server...');
 
-process.on('SIGINT', async () => {
-  console.log('🛑 Recibido SIGINT, cerrando gracefully...');
+  try {
+    const ingredientRepository = new IngredientRepository(pool);
+    const reservationRepository = new ReservationRepository(pool);
+    const inventoryController = new InventoryController(ingredientRepository, reservationRepository);
+
+    const PORT = parseInt(process.env.SERVICE_PORT || '3002');
+
+    httpServer = http.createServer(async (req, res) => {
+      // Health check endpoint
+      if (req.method === 'GET' && req.url === '/health') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ status: 'healthy', service: 'inventory-service' }));
+        return;
+      }
+
+      // GET /inventory/ingredients - List all ingredients
+      if (req.method === 'GET' && req.url === '/inventory/ingredients') {
+        await inventoryController.handleGetIngredients(req, res);
+        return;
+      }
+
+      // GET /inventory/ingredients/:id - Get single ingredient
+      const ingredientIdMatch = req.url?.match(/^\/inventory\/ingredients\/([a-f0-9-]+)$/i);
+      if (req.method === 'GET' && ingredientIdMatch) {
+        const ingredientId = ingredientIdMatch[1]!;
+        await inventoryController.handleGetIngredientById(req, res, ingredientId);
+        return;
+      }
+
+      // GET /inventory/reservations - List all active reservations or filter by orderId
+      if (req.method === 'GET' && req.url && req.url.startsWith('/inventory/reservations')) {
+        const url = new URL(req.url, 'http://localhost');
+        const queryParams = Object.fromEntries(url.searchParams);
+        await inventoryController.handleGetReservations(req, res, queryParams);
+        return;
+      }
+
+      // 404 para rutas no encontradas
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Not found' }));
+    });
+
+    httpServer.listen(PORT, () => {
+      console.log(`✅ HTTP Server escuchando en puerto ${PORT}`);
+      console.log(`📍 Endpoints disponibles:`);
+      console.log(`   - GET  /health`);
+      console.log(`   - GET  /inventory/ingredients`);
+      console.log(`   - GET  /inventory/ingredients/:id`);
+      console.log(`   - GET  /inventory/reservations`);
+      console.log(`   - GET  /inventory/reservations?orderId=xxx`);
+    });
+  } catch (error) {
+    console.error('❌ Error al inicializar HTTP Server:', error);
+    throw error;
+  }
+}
+
+async function initializeEventBus(sharedEventBus: EventBusLocal) {
+  console.log('\n🔌 Inicializando Event Bus...');
+
+  try {
+    // Usar la instancia compartida del EventBus
+    eventBus = sharedEventBus;
+
+    // Crear router (que crea handlers y use cases internamente)
+    const eventRouter = new EventRouter(pool, eventBus);
+
+    console.log('✅ Event Bus inicializado');
+    console.log(`📬 Escuchando cola: ${process.env.SQS_QUEUE_URL}`);
+
+    // Iniciar consumo de mensajes
+    eventBus.startConsuming(eventRouter.getHandler()).catch((error) => {
+      console.error('❌ Error en consumer:', error);
+      process.exit(1);
+    });
+
+    console.log('✨ inventory-service está listo para recibir eventos\n');
+  } catch (error) {
+    console.error('❌ Error al inicializar Event Bus:', error);
+    throw error;
+  }
+}
+
+async function gracefulShutdown() {
+  console.log('\n🛑 Cerrando inventory-service...');
+
+  if (httpServer) {
+    httpServer.close(() => {
+      console.log('✅ HTTP Server cerrado');
+    });
+  }
+
   if (eventBus) {
     await eventBus.stop();
   }
+
   await closePool();
+  console.log('✅ inventory-service cerrado correctamente');
   process.exit(0);
-});
+}
+
+// Manejar señales de terminación
+process.on('SIGINT', gracefulShutdown);
+process.on('SIGTERM', gracefulShutdown);
+
+// Iniciar aplicación
+async function main() {
+  const ENABLE_HTTP_SERVER = process.env.ENABLE_HTTP_SERVER !== 'false';
+  const RUNTIME_MODE = ENABLE_HTTP_SERVER ? 'local (HTTP + EventBus)' : 'lambda (EventBus only)';
+  
+  try {
+    console.log(`🎯 Iniciando en modo: ${RUNTIME_MODE}\n`);
+    
+    await initializeDatabase();
+    
+    // Crear una única instancia del EventBus compartida
+    const sharedEventBus = createEventBusInstance();
+    
+    // Inicializar HTTP Server solo si está habilitado
+    if (ENABLE_HTTP_SERVER) {
+      await initializeHttpServer(sharedEventBus);
+    } else {
+      console.log('\n⏭️  HTTP Server deshabilitado (ENABLE_HTTP_SERVER=false)');
+      console.log('📌 Modo Lambda: Solo EventBus activo');
+    }
+    
+    // Inicializar Event Bus
+    await initializeEventBus(sharedEventBus);
+  } catch (error) {
+    console.error('❌ Error fatal:', error);
+    process.exit(1);
+  }
+}
 
 main();

@@ -76,4 +76,13 @@ export class ReservationRepository {
     );
     return result.rows;
   }
+
+  async getAllActive(): Promise<Reservation[]> {
+    const result = await this.pool.query(
+      `SELECT * FROM ingredient_reservations 
+       WHERE status <> 'RELEASED' 
+       ORDER BY created_at DESC`
+    );
+    return result.rows;
+  }
 }
