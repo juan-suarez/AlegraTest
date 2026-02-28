@@ -3,7 +3,7 @@ import './App.css';
 import type { Order, InventoryItem, PurchaseHistory, PurchaseStats } from './types';
 import { orderService } from './services/orderService';
 import { RECIPES } from './data/recipes';
-import { OrderCreation } from './components/OrderCreation';
+import { OrderCreation } from './components/orderCreation/OrderCreation';
 import { OrdersInProgress } from './components/OrdersInProgress';
 import { OrderHistory } from './components/OrderHistory';
 import { RecipesMenu } from './components/RecipesMenu';
