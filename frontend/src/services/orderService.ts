@@ -1,8 +1,9 @@
 import type { Order, CreateOrderResponse } from '../types';
+import { globalConfig } from '../config/globalConfig';
 
-const isDev = import.meta.env.DEV;
-const API_ENDPOINT = isDev ? '/prod' : '';
-const DEV_API_KEY = import.meta.env.VITE_API_KEY;
+const isDev = globalConfig.isDev;
+const API_ENDPOINT = globalConfig.apiEndpoint;
+const DEV_API_KEY = globalConfig.apiKey;
 
 const headers: Record<string, string> = {
   'Content-Type': 'application/json',

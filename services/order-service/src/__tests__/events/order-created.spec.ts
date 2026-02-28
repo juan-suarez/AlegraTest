@@ -52,7 +52,7 @@ describe('Order Service - OrderCreated Event', () => {
 
     expect(mockEventBus.publish).toHaveBeenCalledTimes(1);
     expect(mockEventBus.publish).toHaveBeenCalledWith(
-      'order-events',
+      'OrderCreated',
       'OrderCreated',
       expect.objectContaining({
         orderId,
@@ -79,14 +79,14 @@ describe('Order Service - OrderCreated Event', () => {
     expect(mockEventBus.publish).toHaveBeenCalledTimes(2);
     expect(mockEventBus.publish).toHaveBeenNthCalledWith(
       1,
-      'order-events',
+      'OrderCreated',
       'OrderCreated',
       expect.objectContaining({ orderId: orderId1, totalDishes: 3 }),
       'order-service'
     );
     expect(mockEventBus.publish).toHaveBeenNthCalledWith(
       2,
-      'order-events',
+      'OrderCreated',
       'OrderCreated',
       expect.objectContaining({ orderId: orderId2, totalDishes: 5 }),
       'order-service'

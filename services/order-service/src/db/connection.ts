@@ -1,7 +1,6 @@
 import { Pool, PoolClient } from 'pg';
 import * as dotenv from 'dotenv';
-import { getDbPassword } from './secrets';
-import { getIAMAuthToken, isIAMAuthEnabled } from './iam-auth';
+import { globalConfig } from '../config/globalConfig';
 
 dotenv.config();
 
@@ -12,23 +11,15 @@ async function ensurePoolInitialized(): Promise<Pool> {
     return pool;
   }
 
-  let password: string;
-
-  // Use IAM authentication if configured, otherwise fall back to password
-  if (isIAMAuthEnabled()) {
-    console.log('🔐 Using IAM Database Authentication');
-    password = await getIAMAuthToken();
-  } else {
-    console.log('🔑 Using password authentication');
-    password = await getDbPassword();
-  }
+  console.log('🔑 Initializing database connection with password authentication');
+  const password = await globalConfig.getDbPassword();
 
   pool = new Pool({
-    user: isIAMAuthEnabled() ? process.env.DB_IAM_USER! : process.env.DB_USER || 'postgres',
+    user: globalConfig.dbUser,
     password,
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '5432'),
-    database: process.env.DB_NAME || 'order_service',
+    host: globalConfig.dbHostWithDefault,
+    port: globalConfig.dbPort,
+    database: globalConfig.dbName,
     ssl: { rejectUnauthorized: false }, // RDS requires SSL for all connections
   });
 

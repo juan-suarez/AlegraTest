@@ -7,6 +7,7 @@ import { EventBusLocal } from './infrastructure/messaging';
 import { EventRouter } from './infrastructure/messaging/EventRouter';
 import { PurchasingController } from './controllers/PurchasingController';
 import { PurchaseHistoryRepository } from './repositories';
+import { globalConfig } from './config/globalConfig';
 
 // Cargar variables de entorno
 dotenv.config();
@@ -15,21 +16,7 @@ let eventBus: EventBusLocal | null = null;
 let httpServer: http.Server | null = null;
 
 function createEventBusInstance(): EventBusLocal {
-  const config: any = {
-    region: process.env.AWS_REGION || 'us-east-1',
-    accountId: process.env.AWS_ACCOUNT_ID,
-    queueUrl: process.env.SQS_QUEUE_URL!,
-    pollingIntervalMs: parseInt(process.env.POLLING_INTERVAL_MS || '10000'),
-  };
-
-  // Only use LocalStack endpoint in local development
-  if (process.env.AWS_ENDPOINT && process.env.AWS_ENDPOINT.includes('localhost')) {
-    config.endpoint = process.env.AWS_ENDPOINT;
-    config.accessKeyId = process.env.AWS_ACCESS_KEY_ID || 'test';
-    config.secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY || 'test';
-  }
-  // In Lambda/AWS, credentials come from IAM role (not passed explicitly)
-
+  const config = globalConfig.createEventBusConfig();
   return new EventBusLocal(config);
 }
 
@@ -74,7 +61,7 @@ async function initializeHttpServer(sharedEventBus: EventBusLocal) {
     const purchaseHistoryRepository = new PurchaseHistoryRepository(pool);
     const purchasingController = new PurchasingController(purchaseHistoryRepository);
 
-    const PORT = parseInt(process.env.SERVICE_PORT || '3003');
+    const PORT = globalConfig.servicePort;
 
     httpServer = http.createServer(async (req, res) => {
       // Health check endpoint
@@ -128,7 +115,7 @@ async function initializeEventBus(sharedEventBus: EventBusLocal) {
     const eventRouter = new EventRouter(pool, eventBus);
 
     console.log('✅ Event Bus inicializado');
-    console.log(`📬 Escuchando cola: ${process.env.SQS_QUEUE_URL}`);
+    console.log(`📬 Escuchando cola: ${globalConfig.sqsQueueUrl}`);
 
     // Iniciar consumo de mensajes
     eventBus.startConsuming(eventRouter.getHandler()).catch((error) => {
@@ -167,7 +154,7 @@ process.on('SIGTERM', gracefulShutdown);
 
 // Iniciar aplicación
 async function main() {
-  const ENABLE_HTTP_SERVER = process.env.ENABLE_HTTP_SERVER !== 'false';
+  const ENABLE_HTTP_SERVER = globalConfig.enableHttpServer;
   const RUNTIME_MODE = ENABLE_HTTP_SERVER ? 'local (HTTP + EventBus)' : 'lambda (EventBus only)';
   
   try {

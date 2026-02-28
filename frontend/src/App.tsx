@@ -4,11 +4,12 @@ import type { Order, InventoryItem, PurchaseHistory, PurchaseStats } from './typ
 import { orderService } from './services/orderService';
 import { RECIPES } from './data/recipes';
 import { OrderCreation } from './components/orderCreation/OrderCreation';
-import { OrdersInProgress } from './components/OrdersInProgress';
-import { OrderHistory } from './components/OrderHistory';
-import { RecipesMenu } from './components/RecipesMenu';
-import { Inventory } from './components/Inventory';
-import { MarketPurchases } from './components/MarketPurchases';
+import { OrdersInProgress } from './components/ordersInProgress/OrdersInProgress';
+import { OrderHistory } from './components/orderHistory/OrderHistory';
+import { RecipesMenu } from './components/recipesMenu/RecipesMenu';
+import { Inventory } from './components/inventory/Inventory';
+import { MarketPurchases } from './components/marketPurchases/MarketPurchases';
+import { globalConfig } from './config/globalConfig';
 
 function App() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -20,7 +21,7 @@ function App() {
   const [success, setSuccess] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
-  const pollingInterval = parseInt(import.meta.env.VITE_POLLING_INTERVAL || '1000');
+  const pollingInterval = globalConfig.pollingInterval;
 
   // Polling para obtener órdenes
   useEffect(() => {

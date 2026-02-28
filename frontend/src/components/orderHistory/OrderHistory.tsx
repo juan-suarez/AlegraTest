@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Order, OrderStatus } from '../types';
+import type { Order, OrderStatus } from '../../types';
 import './OrderHistory.css';
 
 interface OrderHistoryProps {

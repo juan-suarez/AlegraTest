@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Recipe } from '../types';
+import type { Recipe } from '../../types';
 import './RecipesMenu.css';
 
 interface RecipesMenuProps {

@@ -3,6 +3,7 @@ import pool from './db/connection';
 import { EventBusLocal, EventRouter } from './infrastructure/messaging';
 import { EventEnvelope } from './infrastructure/messaging/types';
 import { PurchaseHistoryRepository } from './repositories';
+import { globalConfig } from './config/globalConfig';
 
 // CORS Headers
 const CORS_HEADERS = {
@@ -24,20 +25,7 @@ async function initializeOnColdStart() {
   console.log('🔧 Lambda cold start - initializing purchasing-service...');
 
   // Initialize EventBus for AWS (credentials not needed - Lambda uses IAM Role)
-  const config: any = {
-    region: process.env.AWS_REGION || 'us-east-1',
-    accountId: process.env.AWS_ACCOUNT_ID,
-    queueUrl: process.env.SQS_QUEUE_URL!,
-    pollingIntervalMs: 0, // No polling in Lambda (triggered by event source)
-  };
-  
-  // Only pass credentials if using LocalStack in development
-  if (process.env.AWS_ENDPOINT && process.env.AWS_ENDPOINT.includes('localhost')) {
-    config.endpoint = process.env.AWS_ENDPOINT;
-    config.accessKeyId = process.env.AWS_ACCESS_KEY_ID || 'test';
-    config.secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY || 'test';
-  }
-  // In Lambda/AWS, credentials come from IAM role (not passed explicitly)
+  const config = globalConfig.createEventBusConfig({ pollingIntervalMs: 0 });
   
   eventBusInstance = new EventBusLocal(config);
 

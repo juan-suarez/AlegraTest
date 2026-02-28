@@ -1,4 +1,5 @@
 import { EventBusLocal } from '../../infrastructure/messaging';
+import { globalConfig } from '../../config/globalConfig';
 
 /**
  * Creates a mocked EventBusLocal instance for testing
@@ -6,12 +7,11 @@ import { EventBusLocal } from '../../infrastructure/messaging';
  */
 export function createMockEventBus(): jest.Mocked<EventBusLocal> {
   const mockEventBus = new EventBusLocal({
-    region: process.env.AWS_REGION || 'us-east-1',
-    endpoint: process.env.AWS_ENDPOINT || 'http://localhost:4566',
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || 'test',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || 'test',
-    queueUrl: process.env.SQS_QUEUE_URL || 'http://localhost:4566/000000000000/order-service-queue',
-    pollingIntervalMs: parseInt(process.env.POLLING_INTERVAL_MS || '1000', 10),
+    ...globalConfig.createEventBusConfig({
+      pollingIntervalMs: 1000,
+      defaultQueueUrl: 'http://localhost:4566/000000000000/order-service-queue',
+    }),
+    endpoint: globalConfig.awsEndpoint || 'http://localhost:4566',
   }) as jest.Mocked<EventBusLocal>;
 
   // Mock the publish method to avoid actual AWS calls

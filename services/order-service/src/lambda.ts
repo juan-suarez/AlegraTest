@@ -12,6 +12,7 @@ import { EventBusLocal, EventRouter } from './infrastructure/messaging';
 import { EventEnvelope } from './infrastructure/messaging/types';
 import { OrderRepository } from './repositories/OrderRepository';
 import { CreateOrderUseCase } from './use-cases/CreateOrderUseCase';
+import { globalConfig } from './config/globalConfig';
 
 // Singleton instances (initialized on cold start)
 let isInitialized = false;
@@ -25,23 +26,9 @@ async function initializeOnColdStart() {
 
   console.log('🔧 Lambda cold start - initializing dependencies...');
 
-  // Initialize EventBus for AWS (credentials not needed - Lambda uses IAM Role)
-  const config: any = {
-    region: process.env.AWS_REGION || 'us-east-1',
-    accountId: process.env.AWS_ACCOUNT_ID,
-    queueUrl: process.env.SQS_QUEUE_URL!,
-    pollingIntervalMs: 0, // No polling in Lambda (triggered by event source)
-  };
-  
-  // Only pass credentials if using LocalStack in development
-  if (process.env.AWS_ENDPOINT && process.env.AWS_ENDPOINT.includes('localhost')) {
-    config.endpoint = process.env.AWS_ENDPOINT;
-    config.accessKeyId = process.env.AWS_ACCESS_KEY_ID || 'test';
-    config.secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY || 'test';
-  }
-  // In Lambda/AWS, credentials come from IAM role (not passed explicitly)
-  
-  eventBusInstance = new EventBusLocal(config);
+  eventBusInstance = new EventBusLocal(
+    globalConfig.createEventBusConfig({ pollingIntervalMs: 0 })
+  );
 
   // Initialize repository and use cases
   orderRepository = new OrderRepository(pool);

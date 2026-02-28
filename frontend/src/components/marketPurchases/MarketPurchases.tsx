@@ -1,5 +1,5 @@
 import React from 'react';
-import type { PurchaseHistory, PurchaseStats } from '../types';
+import type { PurchaseHistory, PurchaseStats } from '../../types';
 import './MarketPurchases.css';
 
 interface MarketPurchasesProps {

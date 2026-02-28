@@ -7,6 +7,7 @@ import {
 } from '@aws-sdk/client-sqs';
 import { EventEnvelope, EventBusConfig, MessageHandler } from './types';
 import { randomUUID } from 'node:crypto';
+import { globalConfig } from '../../config/globalConfig';
 
 export class EventBusLocal {
   private snsClient: SNSClient;
@@ -78,7 +79,7 @@ export class EventBusLocal {
    */
   async startConsuming(handler?: MessageHandler): Promise<void> {
     // Skip in Lambda environment
-    if (process.env.AWS_EXECUTION_ENV) {
+    if (globalConfig.isLambdaRuntime) {
       console.log('⚠️  startConsuming() skipped - running in Lambda environment');
       return;
     }
