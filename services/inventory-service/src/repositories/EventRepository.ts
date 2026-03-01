@@ -1,4 +1,4 @@
-import { Pool } from 'pg';
+import { Pool, PoolClient } from 'pg';
 
 export class EventRepository {
   constructor(private pool: Pool) {}
@@ -11,8 +11,9 @@ export class EventRepository {
     return result.rows.length > 0;
   }
 
-  async markEventProcessed(eventId: string): Promise<void> {
-    await this.pool.query(
+  async markEventProcessed(eventId: string, client?: PoolClient): Promise<void> {
+    const executor = client || this.pool;
+    await executor.query(
       'INSERT INTO events_processed (event_id) VALUES ($1) ON CONFLICT DO NOTHING',
       [eventId]
     );
@@ -26,8 +27,9 @@ export class EventRepository {
     return result.rows.length > 0;
   }
 
-  async markPurchaseFailedEventPublished(orderId: string): Promise<void> {
-    await this.pool.query(
+  async markPurchaseFailedEventPublished(orderId: string, client?: PoolClient): Promise<void> {
+    const executor = client || this.pool;
+    await executor.query(
       'INSERT INTO orders_purchase_failed_published (order_id) VALUES ($1) ON CONFLICT DO NOTHING',
       [orderId]
     );

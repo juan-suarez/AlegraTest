@@ -6,7 +6,6 @@ import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as sns from 'aws-cdk-lib/aws-sns';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
-import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
 import { Construct } from 'constructs';
 import path = require('path');
@@ -103,6 +102,7 @@ export class LambdaServicesConstruct extends Construct {
     orderServiceLambda.addEventSource(
       new lambdaEventSources.SqsEventSource(props.queues.orderServiceQueue, {
         batchSize: 10,
+        reportBatchItemFailures: true,
       }),
     );
 
@@ -119,6 +119,7 @@ export class LambdaServicesConstruct extends Construct {
     kitchenServiceLambda.addEventSource(
       new lambdaEventSources.SqsEventSource(props.queues.kitchenServiceQueue, {
         batchSize: 10,
+        reportBatchItemFailures: true,
       }),
     );
 
@@ -135,6 +136,7 @@ export class LambdaServicesConstruct extends Construct {
     inventoryServiceLambda.addEventSource(
       new lambdaEventSources.SqsEventSource(props.queues.inventoryServiceQueue, {
         batchSize: 10,
+        reportBatchItemFailures: true,
       }),
     );
 
@@ -151,6 +153,7 @@ export class LambdaServicesConstruct extends Construct {
     purchasingServiceLambda.addEventSource(
       new lambdaEventSources.SqsEventSource(props.queues.purchasingServiceQueue, {
         batchSize: 10,
+        reportBatchItemFailures: true,
       }),
     );
 

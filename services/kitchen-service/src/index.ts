@@ -9,6 +9,7 @@ import { globalConfig } from './config/globalConfig';
 dotenv.config();
 
 let eventBus: EventBusLocal | null = null;
+const READY_FILE_PATH = '/tmp/kitchen-ready';
 
 async function initializeDatabase() {
   console.log('🚀 Inicializando kitchen-service...');
@@ -65,6 +66,8 @@ async function initializeEventBus() {
       process.exit(1);
     });
 
+    await fs.promises.writeFile(READY_FILE_PATH, 'ready');
+
     console.log('✨ kitchen-service está listo para recibir eventos\n');
   } catch (error) {
     console.error('❌ Error al inicializar Event Bus:', error);
@@ -79,6 +82,10 @@ async function gracefulShutdown() {
     eventBus.stop();
   }
 
+  try {
+    await fs.promises.unlink(READY_FILE_PATH);
+  } catch {}
+
   await pool.end();
   console.log('✅ kitchen-service cerrado correctamente');
   process.exit(0);
@@ -91,6 +98,10 @@ process.on('SIGTERM', gracefulShutdown);
 // Iniciar aplicación
 async function main() {
   try {
+    try {
+      await fs.promises.unlink(READY_FILE_PATH);
+    } catch {}
+
     await initializeDatabase();
     await initializeEventBus();
   } catch (error) {

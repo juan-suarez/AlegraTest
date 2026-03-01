@@ -1,4 +1,4 @@
-import { Context, SQSEvent, SQSRecord } from 'aws-lambda';
+import { Context, SQSEvent, SQSRecord, SQSBatchResponse } from 'aws-lambda';
 import pool from './db/connection';
 import { EventBusLocal, EventRouter } from './infrastructure/messaging';
 import { EventEnvelope } from './infrastructure/messaging/types';
@@ -27,17 +27,32 @@ async function initializeOnColdStart() {
 }
 
 // SQS event handler
-async function handleSQSEvent(event: SQSEvent): Promise<void> {
+async function handleSQSEvent(event: SQSEvent): Promise<SQSBatchResponse> {
   console.log(`📥 Received ${event.Records.length} SQS message(s)`);
 
-  for (const record of event.Records) {
-    try {
-      await processSQSRecord(record);
-    } catch (error) {
-      console.error('❌ Error processing SQS record:', error);
-      throw error; // Throw to trigger retry or DLQ
+  const results = await Promise.allSettled(
+    event.Records.map((record) => processSQSRecord(record)),
+  );
+
+  const batchItemFailures = results.flatMap((result, index) => {
+    if (result.status === 'fulfilled') {
+      return [];
     }
+
+    const failedRecord = event.Records[index];
+    console.error('❌ Failed SQS record in batch:', {
+      messageId: failedRecord?.messageId,
+      error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+    });
+
+    return failedRecord ? [{ itemIdentifier: failedRecord.messageId }] : [];
+  });
+
+  if (batchItemFailures.length > 0) {
+    console.warn(`⚠️ ${batchItemFailures.length} SQS message(s) failed and will be retried`);
   }
+
+  return { batchItemFailures };
 }
 
 async function processSQSRecord(record: SQSRecord): Promise<void> {
@@ -68,12 +83,7 @@ async function processSQSRecord(record: SQSRecord): Promise<void> {
 }
 
 // Main Lambda handler
-export async function handler(event: SQSEvent, context?: Context): Promise<void> {
-  try {
-    await initializeOnColdStart();
-    await handleSQSEvent(event);
-  } catch (error) {
-    console.error('❌ Lambda handler error:', error);
-    throw error;
-  }
+export async function handler(event: SQSEvent, context?: Context): Promise<SQSBatchResponse> {
+  await initializeOnColdStart();
+  return await handleSQSEvent(event);
 }

@@ -1,9 +1,0 @@
-{
-  "host": "localhost",
-  "port": 32785,
-  "database": "order_service",
-  "user": "postgres",
-  "password": "postgres",
-  "containerId": "3fba6312a929cdacee951da51823c0a024b013ec82ec41d1b990add959f7b4f1",
-  "timestamp": 1772314725116
-}

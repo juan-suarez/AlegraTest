@@ -57,15 +57,25 @@ export class HandleIngredientsRequiredUseCase {
         if (needsToPurchase) {
           allReserved = false;
 
-          const purchaseEvent: PurchaseRequestedEvent = {
-            eventId: randomUUID(),
-            orderId: event.orderId,
-            ingredientId: ingredient.id,
-            ingredientName,
-            quantityRequired: quantityNeeded - quantityToReserve,
-          };
+          const quantityToPurchase = quantityNeeded - quantityToReserve;
+          const BATCH_SIZE = 5;
+          
+          // Fraccionar en batches de 5 para reintentos más resilientes
+          const numBatches = Math.ceil(quantityToPurchase / BATCH_SIZE);
+          
+          for (let i = 0; i < numBatches; i++) {
+            const batchQuantity = Math.min(BATCH_SIZE, quantityToPurchase - (i * BATCH_SIZE));
+            
+            const purchaseEvent: PurchaseRequestedEvent = {
+              eventId: randomUUID(),
+              orderId: event.orderId,
+              ingredientId: ingredient.id,
+              ingredientName,
+              quantityRequired: batchQuantity,
+            };
 
-          await this.eventBus.publish('PurchaseRequested', 'PurchaseRequested', purchaseEvent, 'inventory-service');
+            await this.eventBus.publish('PurchaseRequested', 'PurchaseRequested', purchaseEvent, 'inventory-service');
+          }
         }
       }
 

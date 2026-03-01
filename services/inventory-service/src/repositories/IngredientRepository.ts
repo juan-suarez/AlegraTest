@@ -1,4 +1,4 @@
-import { Pool } from 'pg';
+import { Pool, PoolClient } from 'pg';
 import { Ingredient } from './interfaces';
 
 export class IngredientRepository {
@@ -38,8 +38,9 @@ export class IngredientRepository {
     );
   }
 
-  async addStock(ingredientId: string, quantity: number): Promise<void> {
-    await this.pool.query(
+  async addStock(ingredientId: string, quantity: number, client?: PoolClient): Promise<void> {
+    const executor = client || this.pool;
+    await executor.query(
       'UPDATE ingredients SET stock = stock + $2, updated_at = NOW() WHERE id = $1',
       [ingredientId, quantity]
     );

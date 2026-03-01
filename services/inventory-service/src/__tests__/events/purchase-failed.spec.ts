@@ -393,4 +393,80 @@ describe('Inventory Service - PurchaseFailed Event', () => {
     tomato = await dbHelper.getIngredient(ingredientId1);
     expect(tomato.stock).toBe(11); // 7 + 4 (new partial)
   });
+
+  test('should handle batch purchase scenario: first batch completes, second batch fails', async () => {
+    const orderId = randomUUID();
+    const ingredientId = randomUUID();
+    const reservationId = randomUUID();
+
+    // Setup: Need 7 units, stock=0, will be sent as 2 batches (5 + 2)
+    await dbHelper.createIngredient(ingredientId, 'tomato', 0);
+    await dbHelper.createReservation(reservationId, orderId, ingredientId, 7, 0, 'PURCHASE_PENDING');
+
+    // Simulate first batch (5 units) completing successfully
+    // In real scenario, this would be handled by PurchaseCompletedHandler
+    await dbHelper.updateReservation(reservationId, { quantity_reserved: 5 });
+
+    // Second batch (2 units) fails completely
+    const failedEvent = {
+      eventId: randomUUID(),
+      orderId,
+      ingredientId,
+      quantityPurchased: 0 // Failed to purchase anything in this batch
+    };
+
+    await purchaseFailedHandler.handle(failedEvent);
+
+    // All reservations should be RELEASED
+    const reservation = await dbHelper.getReservation(reservationId);
+    expect(reservation.status).toBe('RELEASED');
+
+    // Stock should include the 5 units from successful first batch
+    const ingredient = await dbHelper.getIngredient(ingredientId);
+    expect(ingredient.stock).toBe(5); // 0 + 5 (from released reservation) + 0 (failed batch)
+
+    // Should publish IngredientsPurchaseFailed
+    expect(mockEventBus.published).toHaveLength(1);
+    expect(mockEventBus.published[0].type).toBe('IngredientsPurchaseFailed');
+  });
+
+  test('should handle batch purchase scenario: first batch completes, second batch partially completes then fails', async () => {
+    const orderId = randomUUID();
+    const ingredientId = randomUUID();
+    const reservationId = randomUUID();
+
+    // Setup: Need 12 units, stock=0, will be sent as 3 batches (5 + 5 + 2)
+    await dbHelper.createIngredient(ingredientId, 'onion', 0);
+    await dbHelper.createReservation(reservationId, orderId, ingredientId, 12, 0, 'PURCHASE_PENDING');
+
+    // First batch (5 units) completes successfully
+    await dbHelper.updateReservation(reservationId, { quantity_reserved: 5 });
+
+    // Second batch (5 units) also completes
+    await dbHelper.updateReservation(reservationId, { quantity_reserved: 10 });
+
+    // Third batch (2 units) fails but got 1 unit
+    const failedEvent = {
+      eventId: randomUUID(),
+      orderId,
+      ingredientId,
+      quantityPurchased: 1 // Partial success
+    };
+
+    await purchaseFailedHandler.handle(failedEvent);
+
+    // Reservation should be RELEASED
+    const reservation = await dbHelper.getReservation(reservationId);
+    expect(reservation.status).toBe('RELEASED');
+
+    // Stock should include:
+    // - 10 units from first two batches (released)
+    // - 1 unit from third batch partial purchase
+    const ingredient = await dbHelper.getIngredient(ingredientId);
+    expect(ingredient.stock).toBe(11); // 0 + 10 (released) + 1 (partial)
+
+    // Should publish IngredientsPurchaseFailed
+    expect(mockEventBus.published).toHaveLength(1);
+    expect(mockEventBus.published[0].type).toBe('IngredientsPurchaseFailed');
+  });
 });

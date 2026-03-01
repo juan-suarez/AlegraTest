@@ -29,15 +29,15 @@ export class HandlePurchaseFailedUseCase {
 
       if (!alreadyPublishedFailure) {
 
-        const releasedReservations = await this.reservationRepo.releaseAllForOrder(event.orderId);
+        const releasedReservations = await this.reservationRepo.releaseAllForOrder(event.orderId, client);
 
         for (const released of releasedReservations) {
-          await this.ingredientRepo.addStock(released.ingredient_id, released.quantity_reserved);
+          await this.ingredientRepo.addStock(released.ingredient_id, released.quantity_reserved, client);
         }
       }
 
       if (event.quantityPurchased > 0) {
-        await this.ingredientRepo.addStock(event.ingredientId, event.quantityPurchased);
+        await this.ingredientRepo.addStock(event.ingredientId, event.quantityPurchased, client);
       }
 
       if (!alreadyPublishedFailure) {
@@ -47,10 +47,10 @@ export class HandlePurchaseFailedUseCase {
         };
 
         await this.eventBus.publish('IngredientsPurchaseFailed', 'IngredientsPurchaseFailed', failedEvent, 'inventory-service');
-        await this.eventRepo.markPurchaseFailedEventPublished(event.orderId);
+        await this.eventRepo.markPurchaseFailedEventPublished(event.orderId, client);
       }
 
-      await this.eventRepo.markEventProcessed(event.eventId);
+      await this.eventRepo.markEventProcessed(event.eventId, client);
       await client.query('COMMIT');
 
     } catch (error) {

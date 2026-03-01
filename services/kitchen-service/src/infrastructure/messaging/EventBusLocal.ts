@@ -100,9 +100,14 @@ export class EventBusLocal {
 
         if (messages && messages.length > 0) {
           console.log(`📬 Received ${messages.length} message(s)`);
-          
-          for (const message of messages) {
-            await this.processMessage(message, messageHandler);
+
+          const results = await Promise.allSettled(
+            messages.map((message) => this.processMessage(message, messageHandler)),
+          );
+
+          const failed = results.filter((result) => result.status === 'rejected').length;
+          if (failed > 0) {
+            console.warn(`⚠️ Failed ${failed}/${messages.length} message(s), they will be retried by SQS`);
           }
         }
 

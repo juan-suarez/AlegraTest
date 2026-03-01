@@ -1,0 +1,60 @@
+
+> inventory_service@1.0.0 test
+> jest --forceExit
+
+
+🚀 [GLOBAL SETUP] Starting single PostgreSQL container for ALL tests...
+
+✅ [GLOBAL SETUP] PostgreSQL ready at localhost:32800
+
+PASS src/__tests__/inventory.spec.ts
+PASS src/__tests__/events/ingredients-required.spec.ts
+  ● Console
+
+    console.error
+      ❌ Error in HandleIngredientsRequiredUseCase {
+        eventId: '597f4e3c-3649-46d1-96f8-a15c4a417565',
+        orderId: 'c816031d-48fb-48c9-84e1-773362cab6a4',
+        error: 'Ingredient non-existent-ingredient not found',
+        stack: 'Error: Ingredient non-existent-ingredient not found\n' +
+          '    at HandleIngredientsRequiredUseCase.execute (/home/juanma/AlegraTest/services/inventory-service/src/use-cases/HandleIngredientsRequiredUseCase.ts:35:17)\n' +
+          '    at processTicksAndRejections (node:internal/process/task_queues:103:5)\n' +
+          '    at IngredientsRequiredHandler.handle (/home/juanma/AlegraTest/services/inventory-service/src/events/handlers/IngredientsRequiredHandler.ts:10:7)\n' +
+          '    at Object.<anonymous> (/home/juanma/AlegraTest/services/inventory-service/src/__tests__/events/ingredients-required.spec.ts:269:5)'
+      }
+
+      94 |     } catch (error) {
+      95 |       await client.query('ROLLBACK');
+    > 96 |       console.error(`❌ Error in HandleIngredientsRequiredUseCase`, {
+         |               ^
+      97 |         eventId: event.eventId,
+      98 |         orderId: event.orderId,
+      99 |         error: error instanceof Error ? error.message : String(error),
+
+      at HandleIngredientsRequiredUseCase.execute (src/use-cases/HandleIngredientsRequiredUseCase.ts:96:15)
+      at IngredientsRequiredHandler.handle (src/events/handlers/IngredientsRequiredHandler.ts:10:7)
+      at Object.<anonymous> (src/__tests__/events/ingredients-required.spec.ts:269:5)
+
+    console.error
+      ❌ Error in IngredientsRequiredHandler {
+        eventId: '597f4e3c-3649-46d1-96f8-a15c4a417565',
+        orderId: 'c816031d-48fb-48c9-84e1-773362cab6a4',
+        error: 'Ingredient non-existent-ingredient not found',
+        stack: 'Error: Ingredient non-existent-ingredient not found\n' +
+          '    at HandleIngredientsRequiredUseCase.execute (/home/juanma/AlegraTest/services/inventory-service/src/use-cases/HandleIngredientsRequiredUseCase.ts:35:17)\n' +
+          '    at processTicksAndRejections (node:internal/process/task_queues:103:5)\n' +
+          '    at IngredientsRequiredHandler.handle (/home/juanma/AlegraTest/services/inventory-service/src/events/handlers/IngredientsRequiredHandler.ts:10:7)\n' +
+          '    at Object.<anonymous> (/home/juanma/AlegraTest/services/inventory-service/src/__tests__/events/ingredients-required.spec.ts:269:5)'
+      }
+
+      10 |       await this.useCase.execute(event);
+      11 |     } catch (error) {
+    > 12 |       console.error('❌ Error in IngredientsRequiredHandler', {
+         |               ^
+      13 |         eventId: event.eventId,
+      14 |         orderId: event.orderId,
+      15 |         error: error instanceof Error ? error.message : String(error),
+
+      at IngredientsRequiredHandler.handle (src/events/handlers/IngredientsRequiredHandler.ts:12:15)
+      at Object.<anonymous> (src/__tests__/events/ingredients-required.spec.ts:269:5)
+

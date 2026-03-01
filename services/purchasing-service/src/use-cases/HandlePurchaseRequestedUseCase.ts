@@ -10,8 +10,8 @@ import { UseCase } from './UseCase';
 import { randomUUID } from 'node:crypto';
 
 export class HandlePurchaseRequestedUseCase implements UseCase<PurchaseRequestedEvent> {
-  private readonly MAX_RETRIES = 3;
-  private readonly BASE_DELAY_MS = 200;
+  private readonly MAX_RETRIES = 5;
+  private readonly BASE_DELAY_MS = 100;
 
   constructor(
     private eventRepo: EventRepository,

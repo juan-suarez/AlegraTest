@@ -1,4 +1,4 @@
-import { Context, APIGatewayProxyEvent, SQSEvent, SQSRecord } from 'aws-lambda';
+import { Context, APIGatewayProxyEvent, SQSEvent, SQSRecord, SQSBatchResponse } from 'aws-lambda';
 import pool from './db/connection';
 import { EventBusLocal, EventRouter } from './infrastructure/messaging';
 import { EventEnvelope } from './infrastructure/messaging/types';
@@ -147,17 +147,32 @@ async function handleApiGatewayEvent(event: APIGatewayProxyEvent): Promise<any> 
   };
 }
 
-async function handleSQSEvent(event: SQSEvent): Promise<void> {
+async function handleSQSEvent(event: SQSEvent): Promise<SQSBatchResponse> {
   console.log(`📥 Received ${event.Records.length} SQS message(s)`);
 
-  for (const record of event.Records) {
-    try {
-      await processSQSRecord(record);
-    } catch (error) {
-      console.error('❌ Error processing SQS record:', error);
-      throw error; // Throw to trigger retry or DLQ
+  const results = await Promise.allSettled(
+    event.Records.map((record) => processSQSRecord(record)),
+  );
+
+  const batchItemFailures = results.flatMap((result, index) => {
+    if (result.status === 'fulfilled') {
+      return [];
     }
+
+    const failedRecord = event.Records[index];
+    console.error('❌ Failed SQS record in batch:', {
+      messageId: failedRecord?.messageId,
+      error: result.reason instanceof Error ? result.reason.message : String(result.reason),
+    });
+
+    return failedRecord ? [{ itemIdentifier: failedRecord.messageId }] : [];
+  });
+
+  if (batchItemFailures.length > 0) {
+    console.warn(`⚠️ ${batchItemFailures.length} SQS message(s) failed and will be retried`);
   }
+
+  return { batchItemFailures };
 }
 
 async function processSQSRecord(record: SQSRecord): Promise<void> {
@@ -192,16 +207,18 @@ export async function handler(
   event: APIGatewayProxyEvent | SQSEvent | any,
   context?: Context
 ): Promise<any> {
+  // SQS path: never return API-style payloads on error
+  if (event.Records && Array.isArray(event.Records)) {
+    await initializeOnColdStart();
+    return await handleSQSEvent(event as SQSEvent);
+  }
+
   try {
     // Initialize on cold start
     await initializeOnColdStart();
 
     // Route to appropriate handler
-    if (event.Records && Array.isArray(event.Records)) {
-      // SQS Event
-      await handleSQSEvent(event as SQSEvent);
-      return { statusCode: 200 };
-    } else if (event.httpMethod && event.path) {
+    if (event.httpMethod && event.path) {
       // API Gateway Event
       return await handleApiGatewayEvent(event as APIGatewayProxyEvent);
     }

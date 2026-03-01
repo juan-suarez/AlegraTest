@@ -109,11 +109,22 @@ describe('Inventory Service - IngredientsRequired Event', () => {
     expect(reservation.quantity_needed).toBe(10);
     expect(reservation.quantity_reserved).toBe(3);
 
-    expect(mockEventBus.published).toHaveLength(1);
+    // Should publish 2 PurchaseRequested events (batch size 5: 5 + 2 = 7)
+    expect(mockEventBus.published).toHaveLength(2);
     expect(mockEventBus.published[0].type).toBe('PurchaseRequested');
     expect(mockEventBus.published[0].event.orderId).toBe(orderId);
     expect(mockEventBus.published[0].event.ingredientId).toBe(tomatoId);
-    expect(mockEventBus.published[0].event.quantityRequired).toBe(7);
+    expect(mockEventBus.published[0].event.quantityRequired).toBe(5);
+    
+    expect(mockEventBus.published[1].type).toBe('PurchaseRequested');
+    expect(mockEventBus.published[1].event.orderId).toBe(orderId);
+    expect(mockEventBus.published[1].event.ingredientId).toBe(tomatoId);
+    expect(mockEventBus.published[1].event.quantityRequired).toBe(2);
+    
+    // Verify total quantity requested
+    const totalRequested = mockEventBus.published.reduce((sum: number, p: any) => 
+      sum + p.event.quantityRequired, 0);
+    expect(totalRequested).toBe(7);
   });
 
   test('should handle mixed scenario: some reserved, some need purchase', async () => {
@@ -145,8 +156,15 @@ describe('Inventory Service - IngredientsRequired Event', () => {
     expect(tomatoReservation?.status).toBe('RESERVED');
     expect(onionReservation?.status).toBe('PURCHASE_PENDING');
 
-    expect(mockEventBus.published).toHaveLength(1);
-    expect(mockEventBus.published[0].type).toBe('PurchaseRequested');
+    // Should publish 2 PurchaseRequested events for onion (batch size 5: 5 + 3 = 8)
+    expect(mockEventBus.published).toHaveLength(2);
+    expect(mockEventBus.published.every((p: any) => p.type === 'PurchaseRequested')).toBe(true);
+    expect(mockEventBus.published.every((p: any) => p.event.ingredientId === onionId)).toBe(true);
+    
+    // Verify total quantity requested for onion
+    const totalRequested = mockEventBus.published.reduce((sum: number, p: any) => 
+      sum + p.event.quantityRequired, 0);
+    expect(totalRequested).toBe(8);
   });
 
   test('should be idempotent for duplicate IngredientsRequired events', async () => {

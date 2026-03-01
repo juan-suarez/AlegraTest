@@ -134,7 +134,7 @@ services:
     networks:
       - restaurant-network
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -f 'node.*kitchen' > /dev/null || exit 1"]
+      test: ["CMD-SHELL", "test -f /tmp/kitchen-ready"]
       interval: 10s
       timeout: 5s
       retries: 3

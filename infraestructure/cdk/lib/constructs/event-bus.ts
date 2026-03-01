@@ -41,31 +41,69 @@ export class EventBusConstruct extends Construct {
   constructor(scope: Construct, id: string) {
     super(scope, id);
 
+    const MAX_RECEIVE_COUNT = 3;
+
     // ============================================================
     // PASO 1: Create SQS Queues
     // ============================================================
+    const orderServiceDlq = new sqs.Queue(this, 'OrderServiceDLQ', {
+      queueName: 'order-service-dlq',
+      retentionPeriod: cdk.Duration.days(14),
+    });
+
+    const kitchenServiceDlq = new sqs.Queue(this, 'KitchenServiceDLQ', {
+      queueName: 'kitchen-service-dlq',
+      retentionPeriod: cdk.Duration.days(14),
+    });
+
+    const inventoryServiceDlq = new sqs.Queue(this, 'InventoryServiceDLQ', {
+      queueName: 'inventory-service-dlq',
+      retentionPeriod: cdk.Duration.days(14),
+    });
+
+    const purchasingServiceDlq = new sqs.Queue(this, 'PurchasingServiceDLQ', {
+      queueName: 'purchasing-service-dlq',
+      retentionPeriod: cdk.Duration.days(14),
+    });
+
     const orderServiceQueue = new sqs.Queue(this, 'OrderServiceQueue', {
       queueName: 'order-service-queue',
       visibilityTimeout: cdk.Duration.seconds(300),
       retentionPeriod: cdk.Duration.hours(1),
+      deadLetterQueue: {
+        maxReceiveCount: MAX_RECEIVE_COUNT,
+        queue: orderServiceDlq,
+      },
     });
 
     const kitchenServiceQueue = new sqs.Queue(this, 'KitchenServiceQueue', {
       queueName: 'kitchen-service-queue',
       visibilityTimeout: cdk.Duration.seconds(300),
       retentionPeriod: cdk.Duration.hours(1),
+      deadLetterQueue: {
+        maxReceiveCount: MAX_RECEIVE_COUNT,
+        queue: kitchenServiceDlq,
+      },
     });
 
     const inventoryServiceQueue = new sqs.Queue(this, 'InventoryServiceQueue', {
       queueName: 'inventory-service-queue',
       visibilityTimeout: cdk.Duration.seconds(300),
       retentionPeriod: cdk.Duration.hours(1),
+      deadLetterQueue: {
+        maxReceiveCount: MAX_RECEIVE_COUNT,
+        queue: inventoryServiceDlq,
+      },
     });
 
     const purchasingServiceQueue = new sqs.Queue(this, 'PurchasingServiceQueue', {
       queueName: 'purchasing-service-queue',
       visibilityTimeout: cdk.Duration.seconds(300),
       retentionPeriod: cdk.Duration.hours(1),
+      deadLetterQueue: {
+        maxReceiveCount: MAX_RECEIVE_COUNT,
+        queue: purchasingServiceDlq,
+      },
     });
 
     // ============================================================

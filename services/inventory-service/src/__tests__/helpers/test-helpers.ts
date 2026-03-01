@@ -95,4 +95,29 @@ export class TestDatabaseHelper {
       [id, status]
     );
   }
+
+  async updateReservation(id: string, updates: { quantity_reserved?: number; status?: string }) {
+    const setClauses: string[] = [];
+    const values: any[] = [id];
+    let paramIndex = 2;
+
+    if (updates.quantity_reserved !== undefined) {
+      setClauses.push(`quantity_reserved = $${paramIndex}`);
+      values.push(updates.quantity_reserved);
+      paramIndex++;
+    }
+
+    if (updates.status !== undefined) {
+      setClauses.push(`status = $${paramIndex}`);
+      values.push(updates.status);
+      paramIndex++;
+    }
+
+    if (setClauses.length > 0) {
+      await this.pool.query(
+        `UPDATE ingredient_reservations SET ${setClauses.join(', ')} WHERE id = $1`,
+        values
+      );
+    }
+  }
 }

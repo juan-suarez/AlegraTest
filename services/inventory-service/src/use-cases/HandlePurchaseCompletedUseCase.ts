@@ -39,25 +39,35 @@ export class HandlePurchaseCompletedUseCase {
         throw new Error(`Reservation not found for order ${event.orderId} and ingredient ${event.ingredientId}`);
       }
 
+      // Already released: add entire quantity to stock
       if (reservation.status === 'RELEASED') {
-        await this.ingredientRepo.addStock(event.ingredientId, event.quantityPurchased);
-        await this.eventRepo.markEventProcessed(event.eventId);
+        await this.ingredientRepo.addStock(event.ingredientId, event.quantityPurchased, client);
+        await this.eventRepo.markEventProcessed(event.eventId, client);
         await client.query('COMMIT');
         return;
       }
 
-      const remaining = event.quantityPurchased - reservation.quantity_needed;
+      // Atomically increment reserved quantity and calculate overflow
+      const { overflow, isComplete } = await this.reservationRepo.incrementAndCalculateOverflow(
+        reservation.id,
+        event.quantityPurchased,
+        client
+      );
 
-      await this.reservationRepo.updateStatus(reservation.id, 'RESERVED');
-
-      if (remaining > 0) {
-        await this.ingredientRepo.addStock(event.ingredientId, remaining);
+      // Add overflow to stock
+      if (overflow > 0) {
+        await this.ingredientRepo.addStock(event.ingredientId, overflow, client);
       }
 
-      const allReserved = await this.reservationRepo.areAllReserved(event.orderId);
+      // Update status if reservation is now complete
+      if (isComplete) {
+        await this.reservationRepo.updateStatus(reservation.id, 'RESERVED', client);
+      }
+
+      // Check if all ingredients for order are now reserved
+      const allReserved = await this.reservationRepo.areAllReserved(event.orderId, client);
 
       if (allReserved) {
-
         const reservedEvent: IngredientsReservedEvent = {
           eventId: randomUUID(),
           orderId: event.orderId,
@@ -66,7 +76,7 @@ export class HandlePurchaseCompletedUseCase {
         await this.eventBus.publish('IngredientsReserved', 'IngredientsReserved', reservedEvent, 'inventory-service');
       }
 
-      await this.eventRepo.markEventProcessed(event.eventId);
+      await this.eventRepo.markEventProcessed(event.eventId, client);
       await client.query('COMMIT');
 
     } catch (error) {
