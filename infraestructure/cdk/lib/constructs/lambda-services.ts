@@ -98,11 +98,12 @@ export class LambdaServicesConstruct extends Construct {
       props.queues.orderServiceQueue,
     );
 
-    // Add SQS event source
+    // Add SQS event source with maxConcurrency
     orderServiceLambda.addEventSource(
       new lambdaEventSources.SqsEventSource(props.queues.orderServiceQueue, {
-        batchSize: 10,
+        batchSize: 5,
         reportBatchItemFailures: true,
+        maxConcurrency: 2, // Limit concurrent Lambda executions polling this queue
       }),
     );
 
@@ -115,11 +116,12 @@ export class LambdaServicesConstruct extends Construct {
       props.queues.kitchenServiceQueue,
     );
 
-    // Add SQS event source
+    // Add SQS event source with maxConcurrency
     kitchenServiceLambda.addEventSource(
       new lambdaEventSources.SqsEventSource(props.queues.kitchenServiceQueue, {
-        batchSize: 10,
+        batchSize: 5,
         reportBatchItemFailures: true,
+        maxConcurrency: 2, // Limit concurrent Lambda executions polling this queue (minimum is 2)
       }),
     );
 
@@ -132,11 +134,12 @@ export class LambdaServicesConstruct extends Construct {
       props.queues.inventoryServiceQueue,
     );
 
-    // Add SQS event source
+    // Add SQS event source with maxConcurrency
     inventoryServiceLambda.addEventSource(
       new lambdaEventSources.SqsEventSource(props.queues.inventoryServiceQueue, {
-        batchSize: 10,
+        batchSize: 5,
         reportBatchItemFailures: true,
+        maxConcurrency: 3, // Limit concurrent Lambda executions polling this queue
       }),
     );
 
@@ -149,11 +152,12 @@ export class LambdaServicesConstruct extends Construct {
       props.queues.purchasingServiceQueue,
     );
 
-    // Add SQS event source
+    // Add SQS event source with maxConcurrency
     purchasingServiceLambda.addEventSource(
       new lambdaEventSources.SqsEventSource(props.queues.purchasingServiceQueue, {
-        batchSize: 10,
+        batchSize: 5,
         reportBatchItemFailures: true,
+        maxConcurrency: 3, // Limit concurrent Lambda executions polling this queue
       }),
     );
 
@@ -171,6 +175,7 @@ export class LambdaServicesConstruct extends Construct {
     props: LambdaServicesProps,
     role: iam.Role,
     serviceQueue: sqs.Queue,
+    reservedConcurrentExecutions?: number,
   ): lambda.Function {
     // Create Lambda function with NodejsFunction (auto-bundles dependencies)
     const lambdaFunction = new NodejsFunction(this, `${serviceName}Function`, {
@@ -181,6 +186,7 @@ export class LambdaServicesConstruct extends Construct {
       timeout: cdk.Duration.seconds(300),
       memorySize: 256,
       role,
+      reservedConcurrentExecutions,
       environment: {
         NODE_ENV: 'production',
         DB_HOST: props.dbHost,

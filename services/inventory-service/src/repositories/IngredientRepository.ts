@@ -20,8 +20,9 @@ export class IngredientRepository {
     return result.rows[0] || null;
   }
 
-  async lockAndGetStock(ingredientId: string): Promise<number> {
-    const result = await this.pool.query(
+  async lockAndGetStock(ingredientId: string, client?: PoolClient): Promise<number> {
+    const executor = client || this.pool;
+    const result = await executor.query(
       'SELECT stock FROM ingredients WHERE id = $1 FOR UPDATE',
       [ingredientId]
     );
@@ -31,8 +32,9 @@ export class IngredientRepository {
     return result.rows[0].stock;
   }
 
-  async updateStock(ingredientId: string, newStock: number): Promise<void> {
-    await this.pool.query(
+  async updateStock(ingredientId: string, newStock: number, client?: PoolClient): Promise<void> {
+    const executor = client || this.pool;
+    await executor.query(
       'UPDATE ingredients SET stock = $2, updated_at = NOW() WHERE id = $1',
       [ingredientId, newStock]
     );

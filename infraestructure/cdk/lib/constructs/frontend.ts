@@ -104,8 +104,15 @@ export class FrontendConstruct extends Construct {
     // ============================================================
     const frontendPath = path.join(__dirname, '../../../../frontend');
     const distPath = path.join(frontendPath, 'dist');
+    
+    // Construct API endpoint manually to avoid token resolution issues
+    const region = cdk.Stack.of(this).region;
+    const urlSuffix = cdk.Stack.of(this).urlSuffix;
+    const stageName = props.restApi.deploymentStage.stageName;
+    const apiGatewayEndpoint = `https://${props.restApi.restApiId}.execute-api.${region}.${urlSuffix}/${stageName}`;
 
     console.log('📦 Building frontend for CloudFront + API proxy...');
+    console.log(`🔗 Auto-generated API Endpoint: ${apiGatewayEndpoint}`);
     try {
       exec.execSync('npm run build', {
         cwd: frontendPath,
@@ -113,6 +120,11 @@ export class FrontendConstruct extends Construct {
         env: {
           ...process.env,
           VITE_POLLING_INTERVAL: process.env.VITE_POLLING_INTERVAL || '5000',
+          // Allow user to override with VITE_API_ENDPOINT env var
+          // If not provided, use empty string for CloudFront same-origin mode
+          // (CloudFront will add x-api-key to proxied requests)
+          VITE_API_ENDPOINT: process.env.VITE_API_ENDPOINT || '',
+          VITE_API_KEY: process.env.VITE_API_KEY || '',
         },
       });
     } catch (error) {

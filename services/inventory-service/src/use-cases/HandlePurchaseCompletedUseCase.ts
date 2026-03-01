@@ -22,12 +22,15 @@ export class HandlePurchaseCompletedUseCase {
     }
 
     const client = await this.pool.connect();
+    let shouldPublishReserved = false;
     try {
       await client.query('BEGIN');
 
       const reservation = await this.reservationRepo.getByOrderAndIngredient(
         event.orderId,
-        event.ingredientId
+        event.ingredientId,
+        client,
+        true // lockForUpdate: prevent other transactions from modifying this row
       );
 
       if (!reservation) {
@@ -68,16 +71,19 @@ export class HandlePurchaseCompletedUseCase {
       const allReserved = await this.reservationRepo.areAllReserved(event.orderId, client);
 
       if (allReserved) {
-        const reservedEvent: IngredientsReservedEvent = {
-          eventId: randomUUID(),
-          orderId: event.orderId,
-        };
-
-        await this.eventBus.publish('IngredientsReserved', 'IngredientsReserved', reservedEvent, 'inventory-service');
+        shouldPublishReserved = true;
       }
 
       await this.eventRepo.markEventProcessed(event.eventId, client);
       await client.query('COMMIT');
+
+      if (shouldPublishReserved) {
+        const reservedEvent: IngredientsReservedEvent = {
+          eventId: randomUUID(),
+          orderId: event.orderId,
+        };
+        await this.eventBus.publish('IngredientsReserved', 'IngredientsReserved', reservedEvent, 'inventory-service');
+      }
 
     } catch (error) {
       await client.query('ROLLBACK');

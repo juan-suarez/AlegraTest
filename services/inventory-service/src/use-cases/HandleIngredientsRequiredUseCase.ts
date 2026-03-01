@@ -24,6 +24,8 @@ export class HandleIngredientsRequiredUseCase {
     }
 
     const client = await this.pool.connect();
+    const pendingPurchaseEvents: PurchaseRequestedEvent[] = [];
+    let pendingReservedEvent: IngredientsReservedEvent | null = null;
     try {
       await client.query('BEGIN');
 
@@ -35,11 +37,11 @@ export class HandleIngredientsRequiredUseCase {
           throw new Error(`Ingredient ${ingredientName} not found`);
         }
 
-        const currentStock = await this.ingredientRepo.lockAndGetStock(ingredient.id);
+        const currentStock = await this.ingredientRepo.lockAndGetStock(ingredient.id, client);
         const quantityToReserve = Math.min(currentStock, quantityNeeded);
         const newStock = Math.max(0, currentStock - quantityNeeded);
 
-        await this.ingredientRepo.updateStock(ingredient.id, newStock);
+        await this.ingredientRepo.updateStock(ingredient.id, newStock, client);
 
         const needsToPurchase = quantityToReserve < quantityNeeded;
         const status = needsToPurchase ? 'PURCHASE_PENDING' : 'RESERVED';
@@ -73,23 +75,28 @@ export class HandleIngredientsRequiredUseCase {
               ingredientName,
               quantityRequired: batchQuantity,
             };
-
-            await this.eventBus.publish('PurchaseRequested', 'PurchaseRequested', purchaseEvent, 'inventory-service');
+            pendingPurchaseEvents.push(purchaseEvent);
           }
         }
       }
 
       if (allReserved) {
-        const reservedEvent: IngredientsReservedEvent = {
+        pendingReservedEvent = {
           eventId: randomUUID(),
           orderId: event.orderId,
         };
-
-        await this.eventBus.publish('IngredientsReserved', 'IngredientsReserved', reservedEvent, 'inventory-service');
       }
 
-      await this.eventRepo.markEventProcessed(event.eventId);
+      await this.eventRepo.markEventProcessed(event.eventId, client);
       await client.query('COMMIT');
+
+      for (const purchaseEvent of pendingPurchaseEvents) {
+        await this.eventBus.publish('PurchaseRequested', 'PurchaseRequested', purchaseEvent, 'inventory-service');
+      }
+
+      if (pendingReservedEvent) {
+        await this.eventBus.publish('IngredientsReserved', 'IngredientsReserved', pendingReservedEvent, 'inventory-service');
+      }
 
     } catch (error) {
       await client.query('ROLLBACK');

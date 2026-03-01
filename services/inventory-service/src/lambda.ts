@@ -5,6 +5,7 @@ import { EventEnvelope } from './infrastructure/messaging/types';
 import { IngredientRepository, ReservationRepository } from './repositories';
 import { globalConfig } from './config/globalConfig';
 
+// Version: 2026-03-01-21:27 - Fixed: Pass client to lockAndGetStock and updateStock for transactional consistency
 // CORS Headers
 const CORS_HEADERS = {
   'Content-Type': 'application/json',

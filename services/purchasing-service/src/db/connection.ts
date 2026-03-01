@@ -26,6 +26,10 @@ async function ensurePoolInitialized(): Promise<Pool> {
     port: globalConfig.dbPort,
     database: globalConfig.dbName,
     ssl: sslConfig,
+    max: 3, // Reduced to prevent exhausting RDS connections with Lambda scaling
+    min: 1,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
   });
 
   pool.on('error', (err) => {

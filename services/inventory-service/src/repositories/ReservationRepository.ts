@@ -34,10 +34,14 @@ export class ReservationRepository {
 
   async getByOrderAndIngredient(
     orderId: string,
-    ingredientId: string
+    ingredientId: string,
+    client?: PoolClient,
+    lockForUpdate: boolean = false
   ): Promise<Reservation | null> {
-    const result = await this.pool.query(
-      'SELECT * FROM ingredient_reservations WHERE order_id = $1 AND ingredient_id = $2',
+    const executor = client || this.pool;
+    const lockClause = lockForUpdate && client ? ' FOR UPDATE' : '';
+    const result = await executor.query(
+      `SELECT * FROM ingredient_reservations WHERE order_id = $1 AND ingredient_id = $2${lockClause}`,
       [orderId, ingredientId]
     );
     return result.rows[0] || null;

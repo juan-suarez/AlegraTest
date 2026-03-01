@@ -10,8 +10,9 @@ import { UseCase } from './UseCase';
 import { randomUUID } from 'node:crypto';
 
 export class HandlePurchaseRequestedUseCase implements UseCase<PurchaseRequestedEvent> {
-  private readonly MAX_RETRIES = 5;
-  private readonly BASE_DELAY_MS = 100;
+  private readonly MAX_RETRIES = 8;
+  private readonly BASE_DELAY_MS = 50;
+  private readonly MAX_DELAY_MS = 5000;
 
   constructor(
     private eventRepo: EventRepository,
@@ -40,7 +41,12 @@ export class HandlePurchaseRequestedUseCase implements UseCase<PurchaseRequested
 
     while (accumulatedQuantity < event.quantityRequired && retries < this.MAX_RETRIES) {
       if (retries > 0) {
-        const delay = this.BASE_DELAY_MS * Math.pow(2, retries - 1);
+        // Exponential backoff with cap and jitter
+        const exponentialDelay = this.BASE_DELAY_MS * Math.pow(2, retries - 1);
+        const cappedDelay = Math.min(exponentialDelay, this.MAX_DELAY_MS);
+        // Add jitter: ±20% randomness to avoid thundering herd
+        const jitter = cappedDelay * 0.2 * (Math.random() * 2 - 1);
+        const delay = Math.round(cappedDelay + jitter);
         console.log(`⏳ Waiting ${delay}ms before retry ${retries}...`);
         await this.delay(delay);
       }

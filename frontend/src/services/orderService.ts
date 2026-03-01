@@ -3,32 +3,51 @@ import { globalConfig } from '../config/globalConfig';
 import { resolveServiceUrl } from '../config/apiRouter';
 
 const API_ENDPOINT = globalConfig.apiEndpoint;
-const DEV_API_KEY = globalConfig.apiKey;
+const API_KEY = globalConfig.apiKey;
 const isDev = globalConfig.isDev;
 const isLocalBrowser = typeof window !== 'undefined'
   && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+const isLocalMode = isDev || isLocalBrowser;
 
-const headers: Record<string, string> = {
-  'Content-Type': 'application/json',
-};
+function buildHeaders(): Record<string, string> {
+  const requestHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
 
-if (isDev && DEV_API_KEY) {
-  headers['x-api-key'] = DEV_API_KEY;
+  // Only send x-api-key if ALL conditions are met:
+  // 1. NOT in local mode (local services don't require api-key)
+  // 2. An explicit API_ENDPOINT is configured (not same-origin via CloudFront)
+  // 3. AND an API_KEY is actually provided
+  if (!isLocalMode && API_ENDPOINT && API_KEY) {
+    requestHeaders['x-api-key'] = API_KEY;
+  }
+  // Note: CloudFront same-origin mode (VITE_API_ENDPOINT='') doesn't send header
+  // because CloudFront adds it at the origin level
+
+  return requestHeaders;
 }
 
 /**
  * Builds the complete API URL
  * In local browser: uses local service routing
- * Otherwise: uses centralized API Gateway endpoint
+ * With empty API_ENDPOINT: uses CloudFront same-origin (just the path)
+ * With explicit API_ENDPOINT: uses that endpoint
  */
 function buildUrl(path: string): string {
-  if (isLocalBrowser) {
+  if (isLocalMode) {
     const localUrl = resolveServiceUrl(path);
     if (localUrl) {
       return `${localUrl}${path}`;
     }
   }
 
+  // In production, if API_ENDPOINT is empty, use same-origin (CloudFront scenario)
+  if (!API_ENDPOINT) {
+    // Same-origin request through CloudFront
+    return path;
+  }
+
+  // Otherwise use explicit API_ENDPOINT
   return `${API_ENDPOINT}${path}`;
 }
 
@@ -41,7 +60,7 @@ export const orderService = {
     try {
       const response = await fetch(buildUrl('/orders'), {
         method: 'POST',
-        headers,
+        headers: buildHeaders(),
         body: JSON.stringify({
           orderId,
           totalDishes,
@@ -64,7 +83,7 @@ export const orderService = {
     try {
       const response = await fetch(buildUrl('/orders'), {
         method: 'GET',
-        headers,
+        headers: buildHeaders(),
       });
 
       if (!response.ok) {
@@ -84,7 +103,7 @@ export const orderService = {
     try {
       const response = await fetch(buildUrl('/inventory/ingredients'), {
         method: 'GET',
-        headers,
+        headers: buildHeaders(),
       });
 
       if (!response.ok) {
@@ -103,7 +122,7 @@ export const orderService = {
     try {
       const response = await fetch(buildUrl('/inventory/reservations'), {
         method: 'GET',
-        headers,
+        headers: buildHeaders(),
       });
 
       if (!response.ok) {
@@ -123,7 +142,7 @@ export const orderService = {
     try {
       const response = await fetch(buildUrl('/purchases'), {
         method: 'GET',
-        headers,
+        headers: buildHeaders(),
       });
 
       if (!response.ok) {
@@ -142,7 +161,7 @@ export const orderService = {
     try {
       const response = await fetch(buildUrl('/purchases/stats'), {
         method: 'GET',
-        headers,
+        headers: buildHeaders(),
       });
 
       if (!response.ok) {
