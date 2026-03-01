@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # ============================================================
   # Infrastructure Services
@@ -132,13 +130,11 @@ services:
       SQS_QUEUE_URL: https://sqs.us-east-1.amazonaws.com/000000000000/kitchen-service-queue
       SERVICE_PORT: 3002
       POLLING_INTERVAL_MS: 1000
-      ENABLE_HTTP_SERVER: "true"
-    ports:
-      - "3002:3002"
+      ENABLE_HTTP_SERVER: "false"
     networks:
       - restaurant-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3002/health"]
+      test: ["CMD-SHELL", "pgrep -f 'node.*kitchen' > /dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -211,6 +207,38 @@ services:
       - restaurant-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3004/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # ============================================================
+  # Frontend
+  # ============================================================
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: restaurant-frontend
+    depends_on:
+      order-service:
+        condition: service_healthy
+      inventory-service:
+        condition: service_healthy
+      purchasing-service:
+        condition: service_healthy
+    environment:
+      VITE_DOCKER: "true"
+      VITE_API_ENDPOINT: https://zk8g7otl92.execute-api.us-east-1.amazonaws.com/prod
+      VITE_API_KEY: XmMhd1n9Hx6A5cNLtPsra9THfvrKsFbV3VF3zvPa
+      VITE_POLLING_INTERVAL: 5000
+    ports:
+      - "3000:3000"
+    networks:
+      - restaurant-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/"]
       interval: 10s
       timeout: 5s
       retries: 3

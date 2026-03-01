@@ -7,7 +7,7 @@ const parseNumber = (value: string | undefined, fallback: number): number => {
 };
 
 const isLocalEndpoint = (endpoint: string | undefined): boolean =>
-  Boolean(endpoint && endpoint.includes('localhost'));
+  Boolean(endpoint && (endpoint.includes('localhost') || endpoint.includes('localstack')));
 
 // Cache for database password
 let cachedDbPassword: string | null = null;

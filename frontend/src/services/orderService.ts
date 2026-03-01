@@ -1,9 +1,12 @@
 import type { Order, CreateOrderResponse } from '../types';
 import { globalConfig } from '../config/globalConfig';
+import { resolveServiceUrl } from '../config/apiRouter';
 
-const isDev = globalConfig.isDev;
 const API_ENDPOINT = globalConfig.apiEndpoint;
 const DEV_API_KEY = globalConfig.apiKey;
+const isDev = globalConfig.isDev;
+const isLocalBrowser = typeof window !== 'undefined'
+  && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
 const headers: Record<string, string> = {
   'Content-Type': 'application/json',
@@ -13,6 +16,22 @@ if (isDev && DEV_API_KEY) {
   headers['x-api-key'] = DEV_API_KEY;
 }
 
+/**
+ * Builds the complete API URL
+ * In local browser: uses local service routing
+ * Otherwise: uses centralized API Gateway endpoint
+ */
+function buildUrl(path: string): string {
+  if (isLocalBrowser) {
+    const localUrl = resolveServiceUrl(path);
+    if (localUrl) {
+      return `${localUrl}${path}`;
+    }
+  }
+
+  return `${API_ENDPOINT}${path}`;
+}
+
 export const orderService = {
   // ORDERS
   async createOrder(totalDishes: number): Promise<CreateOrderResponse> {
@@ -20,7 +39,7 @@ export const orderService = {
     const orderId = generateUUID();
 
     try {
-      const response = await fetch(`${API_ENDPOINT}/orders`, {
+      const response = await fetch(buildUrl('/orders'), {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -43,7 +62,7 @@ export const orderService = {
 
   async getOrders(): Promise<Order[]> {
     try {
-      const response = await fetch(`${API_ENDPOINT}/orders`, {
+      const response = await fetch(buildUrl('/orders'), {
         method: 'GET',
         headers,
       });
@@ -63,7 +82,7 @@ export const orderService = {
   // INVENTORY
   async getInventory() {
     try {
-      const response = await fetch(`${API_ENDPOINT}/inventory/ingredients`, {
+      const response = await fetch(buildUrl('/inventory/ingredients'), {
         method: 'GET',
         headers,
       });
@@ -82,7 +101,7 @@ export const orderService = {
 
   async getReservations() {
     try {
-      const response = await fetch(`${API_ENDPOINT}/inventory/reservations`, {
+      const response = await fetch(buildUrl('/inventory/reservations'), {
         method: 'GET',
         headers,
       });
@@ -102,7 +121,7 @@ export const orderService = {
   // PURCHASES
   async getPurchases() {
     try {
-      const response = await fetch(`${API_ENDPOINT}/purchases`, {
+      const response = await fetch(buildUrl('/purchases'), {
         method: 'GET',
         headers,
       });
@@ -121,7 +140,7 @@ export const orderService = {
 
   async getPurchaseStats() {
     try {
-      const response = await fetch(`${API_ENDPOINT}/purchases/stats`, {
+      const response = await fetch(buildUrl('/purchases/stats'), {
         method: 'GET',
         headers,
       });

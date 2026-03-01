@@ -24,6 +24,14 @@ export class OrderRepository {
     return result.rows[0] || null;
   }
 
+  async findAll(): Promise<Order[]> {
+    const result = await this.pool.query(
+      `SELECT * FROM orders 
+       ORDER BY created_at DESC`
+    );
+    return result.rows;
+  }
+
   async updateStatus(orderId: string, status: string): Promise<Order> {
     const result = await this.pool.query(
       `UPDATE orders

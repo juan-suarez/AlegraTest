@@ -64,9 +64,25 @@ async function initializeHttpServer(sharedEventBus: EventBusLocal) {
     const PORT = globalConfig.servicePort;
 
     httpServer = http.createServer(async (req, res) => {
+      const corsHeaders = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type,x-api-key',
+      };
+
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type,x-api-key');
+
+      if (req.method === 'OPTIONS') {
+        res.writeHead(204, corsHeaders);
+        res.end();
+        return;
+      }
+
       // Health check endpoint
       if (req.method === 'GET' && req.url === '/health') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.writeHead(200, { 'Content-Type': 'application/json', ...corsHeaders });
         res.end(JSON.stringify({ status: 'healthy', service: 'inventory-service' }));
         return;
       }
@@ -94,7 +110,7 @@ async function initializeHttpServer(sharedEventBus: EventBusLocal) {
       }
 
       // 404 para rutas no encontradas
-      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.writeHead(404, { 'Content-Type': 'application/json', ...corsHeaders });
       res.end(JSON.stringify({ error: 'Not found' }));
     });
 

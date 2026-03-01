@@ -14,13 +14,18 @@ async function ensurePoolInitialized(): Promise<Pool> {
   console.log('🔑 Initializing database connection with password authentication');
   const password = await globalConfig.getDbPassword();
 
+  // Determine SSL configuration based on environment
+  // Development/Docker: no SSL
+  // Production/RDS: SSL required
+  const sslConfig = process.env.NODE_ENV === 'development' ? false : { rejectUnauthorized: false };
+
   pool = new Pool({
     user: globalConfig.dbUser,
     password,
     host: globalConfig.dbHostWithDefault,
     port: globalConfig.dbPort,
     database: globalConfig.dbName,
-    ssl: { rejectUnauthorized: false }, // RDS requires SSL for all connections
+    ssl: sslConfig,
   });
 
   pool.on('error', (err) => {
