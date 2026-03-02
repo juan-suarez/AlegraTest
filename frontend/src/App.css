@@ -13,8 +13,15 @@
   z-index: 100;
 }
 
+.header-top-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
 .header-content {
-  margin-bottom: 0.75rem;
+  margin-bottom: 0;
 }
 
 .app-header h1 {
@@ -31,53 +38,105 @@
   font-weight: 300;
 }
 
-.header-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 1rem;
+.header-order-creation {
+  margin-top: 0.75rem;
 }
 
-.stat {
-  background: rgba(255, 255, 255, 0.1);
-  padding: 0.75rem;
-  border-radius: 10px;
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+.header-order-creation .order-creation {
+  margin-bottom: 0;
+  padding: 0.6rem 0.8rem;
+  box-shadow: none;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.header-order-creation .order-creation-form {
+  gap: 0.35rem;
+  flex-wrap: nowrap;
+}
+
+.header-order-creation .order-creation-controls {
+  gap: 0.5rem;
+}
+
+.header-order-creation .inline-label {
+  font-size: 0.85rem;
+}
+
+.header-order-creation .order-creation-form input {
+  min-width: 78px;
+  width: 82px;
+}
+
+.header-order-creation .create-button {
+  padding: 0.42rem 0.8rem;
+}
+
+.section-tabs {
+  margin-top: 0;
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 0.2rem;
+}
+
+.logout-button {
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+  border-radius: 999px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.logout-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.tab-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+  border-radius: 999px;
+  padding: 0.42rem 0.68rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.tab-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.tab-button.active {
+  background: rgba(255, 255, 255, 0.95);
+  color: #5a4ec6;
+}
+
+.tab-count {
+  min-width: 1.3rem;
+  padding: 0.12rem 0.35rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.2);
   text-align: center;
-  transition: all 0.3s ease;
+  font-size: 0.72rem;
 }
 
-.stat:hover {
-  background: rgba(255, 255, 255, 0.15);
-  transform: translateY(-2px);
-}
-
-.stat-label {
-  display: block;
-  font-size: 0.75rem;
-  opacity: 0.9;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.stat-value {
-  display: block;
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin-top: 0.35rem;
-}
-
-.stat.in-progress {
-  border-left: 4px solid #ff6b6b;
-}
-
-.stat.completed {
-  border-left: 4px solid #28a745;
-}
-
-.stat.failed {
-  border-left: 4px solid #dc3545;
+.tab-button.active .tab-count {
+  background: #5a4ec6;
+  color: white;
 }
 
 .app-main {
@@ -131,6 +190,10 @@
   gap: 2rem;
 }
 
+.dashboard-single-section {
+  animation: fadeIn 0.35s ease;
+}
+
 .dashboard-section {
   animation: fadeIn 0.5s ease;
 }
@@ -166,6 +229,11 @@
     padding: 1.5rem;
   }
 
+  .header-top-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
   .app-header h1 {
     font-size: 1.8rem;
   }
@@ -174,8 +242,14 @@
     font-size: 1rem;
   }
 
-  .header-stats {
-    grid-template-columns: repeat(2, 1fr);
+  .section-tabs {
+    margin-top: 0.6rem;
+    gap: 0.5rem;
+    justify-content: flex-start;
+  }
+
+  .logout-button {
+    align-self: flex-start;
   }
 }
 
@@ -196,17 +270,23 @@
     font-size: 0.9rem;
   }
 
-  .header-stats {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.5rem;
+  .section-tabs {
+    margin-top: 1rem;
+    padding-bottom: 0.25rem;
+    justify-content: flex-start;
   }
 
-  .stat {
-    padding: 0.75rem;
+  .header-order-creation .order-creation {
+    padding: 0.55rem 0.65rem;
   }
 
-  .stat-value {
-    font-size: 1.5rem;
+  .header-order-creation .order-creation h2 {
+    font-size: 0.95rem;
+  }
+
+  .tab-button {
+    padding: 0.4rem 0.62rem;
+    font-size: 0.78rem;
   }
 
   .app-main {

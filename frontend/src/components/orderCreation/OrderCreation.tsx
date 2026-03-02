@@ -38,10 +38,10 @@ export const OrderCreation: React.FC<OrderCreationProps> = ({ onCreateOrder, isL
 
   return (
     <div className="order-creation">
-      <h2>Crear Nueva Orden</h2>
-      <form onSubmit={handleSubmit}>
-        <div className="form-group">
-          <label htmlFor="totalDishes">Cantidad de Platos:</label>
+      <form onSubmit={handleSubmit} className="order-creation-form">
+        <h2>Nueva Orden</h2>
+        <div className="order-creation-controls">
+          <label htmlFor="totalDishes" className="inline-label">Platos:</label>
           <input
             type="number"
             id="totalDishes"
@@ -52,10 +52,10 @@ export const OrderCreation: React.FC<OrderCreationProps> = ({ onCreateOrder, isL
             onBlur={handleBlur}
             disabled={isLoading}
           />
+          <button type="submit" disabled={isLoading || totalDishes < 1} className="create-button">
+            {isLoading ? 'Creando...' : '+ Crear Orden'}
+          </button>
         </div>
-        <button type="submit" disabled={isLoading || totalDishes < 1} className="create-button">
-          {isLoading ? 'Creando...' : '+ Crear Orden'}
-        </button>
       </form>
     </div>
   );

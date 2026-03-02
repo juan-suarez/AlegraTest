@@ -233,6 +233,7 @@ services:
       VITE_API_ENDPOINT: https://zk8g7otl92.execute-api.us-east-1.amazonaws.com/prod
       VITE_API_KEY: XmMhd1n9Hx6A5cNLtPsra9THfvrKsFbV3VF3zvPa
       VITE_POLLING_INTERVAL: 5000
+      VITE_AUTH_ENABLED: "false"
     ports:
       - "3000:3000"
     networks:

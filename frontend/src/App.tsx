@@ -10,6 +10,30 @@ import { RecipesMenu } from './components/recipesMenu/RecipesMenu';
 import { Inventory } from './components/inventory/Inventory';
 import { MarketPurchases } from './components/marketPurchases/MarketPurchases';
 import { globalConfig } from './config/globalConfig';
+import { authService } from './auth/authService';
+import { LoginScreen } from './components/auth/LoginScreen';
+
+type DashboardTab =
+  | 'ordersInProgress'
+  | 'recipes'
+  | 'inventory'
+  | 'purchases'
+  | 'orderHistory';
+
+const TAB_STORAGE_KEY = 'dashboardActiveTab';
+
+const parseStoredTab = (value: string | null): DashboardTab => {
+  switch (value) {
+    case 'ordersInProgress':
+    case 'recipes':
+    case 'inventory':
+    case 'purchases':
+    case 'orderHistory':
+      return value;
+    default:
+      return 'ordersInProgress';
+  }
+};
 
 function App() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -20,11 +44,40 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [authReady, setAuthReady] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(!globalConfig.auth.enabled);
+  const [activeTab, setActiveTab] = useState<DashboardTab>(() => {
+    if (typeof window === 'undefined') {
+      return 'ordersInProgress';
+    }
+
+    return parseStoredTab(window.localStorage.getItem(TAB_STORAGE_KEY));
+  });
 
   const pollingInterval = globalConfig.pollingInterval;
 
+  useEffect(() => {
+    window.localStorage.setItem(TAB_STORAGE_KEY, activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (!authService.isEnabled()) {
+      setIsAuthenticated(true);
+      setAuthReady(true);
+      return;
+    }
+
+    authService.completeLoginFromUrl();
+    setIsAuthenticated(authService.isAuthenticated());
+    setAuthReady(true);
+  }, []);
+
   // Polling para obtener órdenes
   useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
+
     const fetchOrders = async () => {
       try {
         const data = await orderService.getOrders();
@@ -75,7 +128,7 @@ function App() {
     }, pollingInterval);
 
     return () => clearInterval(interval);
-  }, [pollingInterval]);
+  }, [pollingInterval, isAuthenticated]);
 
   const handleCreateOrder = async (totalDishes: number) => {
     setIsLoading(true);
@@ -109,30 +162,78 @@ function App() {
   const getFailedCount = () =>
     orders.filter((o) => o.status === 'FAILED').length;
 
+  const handleLogout = () => {
+    authService.logout();
+  };
+
+  const tabs = [
+    {
+      key: 'ordersInProgress' as const,
+      label: 'En progreso',
+      count: getInProgressCount(),
+    },
+    {
+      key: 'recipes' as const,
+      label: 'Recetas',
+      count: RECIPES.length,
+    },
+    {
+      key: 'inventory' as const,
+      label: 'Inventario',
+      count: inventory.length,
+    },
+    {
+      key: 'purchases' as const,
+      label: 'Compras',
+      count: purchases.length,
+    },
+    {
+      key: 'orderHistory' as const,
+      label: 'Historial',
+      count: orders.length,
+    },
+  ];
+
+  if (!authReady) {
+    return null;
+  }
+
+  if (authService.isEnabled() && !isAuthenticated) {
+    return <LoginScreen />;
+  }
+
   return (
     <div className="app">
       <header className="app-header">
-        <div className="header-content">
-          <h1>🍽️ Sistema de Gestión de Órdenes</h1>
-          <p className="subtitle">Jornada de Donación de Comida Gratis</p>
+        <div className="header-top-row">
+          <div className="header-content">
+            <h1>🍽️ Sistema de Gestión de Órdenes</h1>
+            <p className="subtitle">Jornada de Donación de Comida Gratis</p>
+          </div>
+
+          {authService.isEnabled() && (
+            <button type="button" className="logout-button" onClick={handleLogout}>
+              Cerrar sesión
+            </button>
+          )}
+
+          <nav className="section-tabs" aria-label="Secciones del dashboard">
+            {tabs.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                className={`tab-button ${activeTab === tab.key ? 'active' : ''}`}
+                onClick={() => setActiveTab(tab.key)}
+              >
+                <span>{tab.label}</span>
+                <span className="tab-count">{tab.count}</span>
+              </button>
+            ))}
+          </nav>
         </div>
-        <div className="header-stats">
-          <div className="stat">
-            <span className="stat-label">Total</span>
-            <span className="stat-value">{getTotalOrders()}</span>
-          </div>
-          <div className="stat in-progress">
-            <span className="stat-label">En Preparación</span>
-            <span className="stat-value">{getInProgressCount()}</span>
-          </div>
-          <div className="stat completed">
-            <span className="stat-label">Completadas</span>
-            <span className="stat-value">{getCompletedCount()}</span>
-          </div>
-          <div className="stat failed">
-            <span className="stat-label">Fallidas</span>
-            <span className="stat-value">{getFailedCount()}</span>
-          </div>
+
+        <div className="header-order-creation">
+          <OrderCreation onCreateOrder={handleCreateOrder} isLoading={isLoading} />
         </div>
       </header>
 
@@ -150,28 +251,24 @@ function App() {
             </div>
           )}
 
-          <OrderCreation onCreateOrder={handleCreateOrder} isLoading={isLoading} />
-
-          <div className="dashboard-grid">
-            <div className="dashboard-section">
-              <OrdersInProgress orders={orders} />
-            </div>
-
-            <div className="dashboard-section">
-              <RecipesMenu recipes={RECIPES} />
-            </div>
-
-            <div className="dashboard-section">
-              <Inventory inventory={inventory} />
-            </div>
-
-            <div className="dashboard-section">
+          <div className="dashboard-single-section">
+            {activeTab === 'ordersInProgress' && <OrdersInProgress orders={orders} />}
+            {activeTab === 'recipes' && <RecipesMenu recipes={RECIPES} />}
+            {activeTab === 'inventory' && <Inventory inventory={inventory} />}
+            {activeTab === 'purchases' && (
               <MarketPurchases purchases={purchases} stats={purchaseStats} />
-            </div>
-
-            <div className="dashboard-section full-width">
-              <OrderHistory orders={orders} />
-            </div>
+            )}
+            {activeTab === 'orderHistory' && (
+              <OrderHistory
+                orders={orders}
+                stats={{
+                  total: getTotalOrders(),
+                  inProgress: getInProgressCount(),
+                  completed: getCompletedCount(),
+                  failed: getFailedCount(),
+                }}
+              />
+            )}
           </div>
 
           <footer className="app-footer">

@@ -1,69 +1,77 @@
 .order-creation {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  padding: 2rem;
+  padding: 0.9rem 1rem;
   border-radius: 12px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
   margin-bottom: 2rem;
   color: white;
+  overflow-x: auto;
 }
 
 .order-creation h2 {
-  margin: 0 0 1.5rem 0;
-  font-size: 1.8rem;
+  margin: 0;
+  font-size: 1rem;
   font-weight: 600;
+  white-space: nowrap;
 }
 
-.order-creation form {
+.order-creation-form {
   display: flex;
-  gap: 1rem;
-  align-items: flex-end;
-}
-
-.form-group {
-  display: flex;
+  gap: 0.45rem;
+  align-items: flex-start;
   flex-direction: column;
-  gap: 0.5rem;
+  flex-wrap: nowrap;
+  min-width: max-content;
 }
 
-.form-group label {
+.order-creation-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: nowrap;
+}
+
+.inline-label {
   font-weight: 500;
-  font-size: 0.95rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
 }
 
-.form-group input {
-  padding: 0.75rem;
+.order-creation-form input {
+  padding: 0.45rem 0.55rem;
   border: 2px solid rgba(255, 255, 255, 0.3);
   border-radius: 8px;
-  font-size: 1rem;
+  font-size: 0.9rem;
   background: rgba(255, 255, 255, 0.1);
   color: white;
-  min-width: 120px;
+  min-width: 85px;
+  width: 90px;
   transition: all 0.3s ease;
 }
 
-.form-group input:hover:not(:disabled) {
+.order-creation-form input:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.2);
   border-color: rgba(255, 255, 255, 0.5);
 }
 
-.form-group input:focus {
+.order-creation-form input:focus {
   outline: none;
   background: rgba(255, 255, 255, 0.2);
   border-color: white;
 }
 
-.form-group input::placeholder {
+.order-creation-form input::placeholder {
   color: rgba(255, 255, 255, 0.7);
 }
 
 .create-button {
-  padding: 0.75rem 2rem;
+  padding: 0.45rem 0.85rem;
   background: white;
   color: #667eea;
   border: none;
   border-radius: 8px;
   font-weight: 600;
-  font-size: 1rem;
+  font-size: 0.85rem;
   cursor: pointer;
   transition: all 0.3s ease;
   flex-shrink: 0;

@@ -1,6 +1,7 @@
 import type { Order, CreateOrderResponse } from '../types';
 import { globalConfig } from '../config/globalConfig';
 import { resolveServiceUrl } from '../config/apiRouter';
+import { authService } from '../auth/authService';
 
 const API_ENDPOINT = globalConfig.apiEndpoint;
 const API_KEY = globalConfig.apiKey;
@@ -23,6 +24,11 @@ function buildHeaders(): Record<string, string> {
   }
   // Note: CloudFront same-origin mode (VITE_API_ENDPOINT='') doesn't send header
   // because CloudFront adds it at the origin level
+
+  const authHeader = authService.getAuthorizationHeader();
+  if (authHeader) {
+    requestHeaders.Authorization = authHeader;
+  }
 
   return requestHeaders;
 }

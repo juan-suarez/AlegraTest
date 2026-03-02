@@ -15,6 +15,49 @@
   display: inline-block;
 }
 
+.history-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.history-stat-card {
+  background: #f8f9fb;
+  border: 1px solid #e8ebf3;
+  border-radius: 10px;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.history-stat-card.in-progress {
+  border-left: 4px solid #ff6b6b;
+}
+
+.history-stat-card.completed {
+  border-left: 4px solid #28a745;
+}
+
+.history-stat-card.failed {
+  border-left: 4px solid #dc3545;
+}
+
+.history-stat-label {
+  font-size: 0.78rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.history-stat-value {
+  font-size: 1.3rem;
+  color: #333;
+  font-weight: 700;
+}
+
 .no-history {
   text-align: center;
   padding: 2rem;

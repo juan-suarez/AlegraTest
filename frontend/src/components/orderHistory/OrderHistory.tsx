@@ -4,9 +4,15 @@ import './OrderHistory.css';
 
 interface OrderHistoryProps {
   orders: Order[];
+  stats: {
+    total: number;
+    inProgress: number;
+    completed: number;
+    failed: number;
+  };
 }
 
-export const OrderHistory: React.FC<OrderHistoryProps> = ({ orders }) => {
+export const OrderHistory: React.FC<OrderHistoryProps> = ({ orders, stats }) => {
   const completedOrders = orders.filter(
     (order) => order.status === 'COMPLETED' || order.status === 'FAILED'
   );
@@ -26,6 +32,26 @@ export const OrderHistory: React.FC<OrderHistoryProps> = ({ orders }) => {
   return (
     <div className="order-history">
       <h3>Historial de Pedidos</h3>
+
+      <div className="history-stats-grid">
+        <div className="history-stat-card">
+          <span className="history-stat-label">Total</span>
+          <span className="history-stat-value">{stats.total}</span>
+        </div>
+        <div className="history-stat-card in-progress">
+          <span className="history-stat-label">En preparación</span>
+          <span className="history-stat-value">{stats.inProgress}</span>
+        </div>
+        <div className="history-stat-card completed">
+          <span className="history-stat-label">Completadas</span>
+          <span className="history-stat-value">{stats.completed}</span>
+        </div>
+        <div className="history-stat-card failed">
+          <span className="history-stat-label">Fallidas</span>
+          <span className="history-stat-value">{stats.failed}</span>
+        </div>
+      </div>
+
       {completedOrders.length === 0 ? (
         <div className="no-history">
           <p>No hay pedidos completados aún</p>

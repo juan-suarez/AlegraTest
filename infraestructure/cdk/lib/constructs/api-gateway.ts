@@ -1,5 +1,6 @@
 import * as cdk from 'aws-cdk-lib';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import { Construct } from 'constructs';
@@ -9,6 +10,8 @@ export interface ApiGatewayProps {
   inventoryServiceLambda: lambda.Function;
   purchasingServiceLambda: lambda.Function;
   apiKeyValue: string;
+  userPool: cognito.UserPool;
+  userPoolClient: cognito.UserPoolClient;
 }
 
 export interface ApiGatewayOutput {
@@ -73,6 +76,18 @@ export class ApiGatewayConstruct extends Construct {
       value: props.apiKeyValue,
     });
 
+    const cognitoAuthorizer = new apigateway.CognitoUserPoolsAuthorizer(this, 'RestaurantCognitoAuthorizer', {
+      cognitoUserPools: [props.userPool],
+      authorizerName: 'restaurant-cognito-authorizer',
+      identitySource: 'method.request.header.Authorization',
+    });
+
+    const protectedMethodOptions: apigateway.MethodOptions = {
+      apiKeyRequired: true,
+      authorizationType: apigateway.AuthorizationType.COGNITO,
+      authorizer: cognitoAuthorizer,
+    };
+
     // Create Usage Plan with rate limiting and quotas
     const usagePlan = new apigateway.UsagePlan(this, 'RestaurantUsagePlan', {
       name: 'restaurant-usage-plan',
@@ -105,9 +120,7 @@ export class ApiGatewayConstruct extends Construct {
       new apigateway.LambdaIntegration(props.orderServiceLambda, {
         proxy: true,
       }),
-      {
-        apiKeyRequired: true,
-      }
+      protectedMethodOptions
     );
 
     ordersResource.addMethod(
@@ -115,9 +128,7 @@ export class ApiGatewayConstruct extends Construct {
       new apigateway.LambdaIntegration(props.orderServiceLambda, {
         proxy: true,
       }),
-      {
-        apiKeyRequired: true,
-      }
+      protectedMethodOptions
     );
 
     // ========================================
@@ -132,9 +143,7 @@ export class ApiGatewayConstruct extends Construct {
       new apigateway.LambdaIntegration(props.inventoryServiceLambda, {
         proxy: true,
       }),
-      {
-        apiKeyRequired: true,
-      }
+      protectedMethodOptions
     );
 
     // GET /inventory/ingredients/{ingredientId}
@@ -144,9 +153,7 @@ export class ApiGatewayConstruct extends Construct {
       new apigateway.LambdaIntegration(props.inventoryServiceLambda, {
         proxy: true,
       }),
-      {
-        apiKeyRequired: true,
-      }
+      protectedMethodOptions
     );
 
     // GET /inventory/reservations
@@ -156,9 +163,7 @@ export class ApiGatewayConstruct extends Construct {
       new apigateway.LambdaIntegration(props.inventoryServiceLambda, {
         proxy: true,
       }),
-      {
-        apiKeyRequired: true,
-      }
+      protectedMethodOptions
     );
 
     // ========================================
@@ -172,9 +177,7 @@ export class ApiGatewayConstruct extends Construct {
       new apigateway.LambdaIntegration(props.purchasingServiceLambda, {
         proxy: true,
       }),
-      {
-        apiKeyRequired: true,
-      }
+      protectedMethodOptions
     );
 
     // GET /purchases/stats
@@ -184,9 +187,7 @@ export class ApiGatewayConstruct extends Construct {
       new apigateway.LambdaIntegration(props.purchasingServiceLambda, {
         proxy: true,
       }),
-      {
-        apiKeyRequired: true,
-      }
+      protectedMethodOptions
     );
 
     // Grant Lambda permissions

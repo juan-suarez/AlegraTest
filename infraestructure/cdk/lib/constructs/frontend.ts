@@ -4,14 +4,18 @@ import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
+import * as iam from 'aws-cdk-lib/aws-iam';
+import * as cr from 'aws-cdk-lib/custom-resources';
 import { Construct } from 'constructs';
 import * as path from 'path';
 import * as exec from 'child_process';
 import * as fs from 'fs';
+import type { AuthConstructOutput } from './auth';
 
 interface FrontendConstructProps {
   restApi: apigateway.RestApi;
   apiKeyValue: string;
+  authOutput: AuthConstructOutput;
 }
 
 interface FrontendConstructOutput {
@@ -34,7 +38,7 @@ export class FrontendConstruct extends Construct {
       autoDeleteObjects: true,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       websiteIndexDocument: 'index.html',
-      websiteErrorDocument: 'index.html', // SPA routing
+      websiteErrorDocument: 'index.html',
       versioned: false,
       encryption: s3.BucketEncryption.S3_MANAGED,
     });
@@ -96,7 +100,7 @@ export class FrontendConstruct extends Construct {
         },
       ],
       defaultRootObject: 'index.html',
-      priceClass: cloudfront.PriceClass.PRICE_CLASS_100, // Free tier optimized
+      priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
     });
 
     // ============================================================
@@ -104,15 +108,18 @@ export class FrontendConstruct extends Construct {
     // ============================================================
     const frontendPath = path.join(__dirname, '../../../../frontend');
     const distPath = path.join(frontendPath, 'dist');
-    
-    // Construct API endpoint manually to avoid token resolution issues
+
     const region = cdk.Stack.of(this).region;
     const urlSuffix = cdk.Stack.of(this).urlSuffix;
     const stageName = props.restApi.deploymentStage.stageName;
     const apiGatewayEndpoint = `https://${props.restApi.restApiId}.execute-api.${region}.${urlSuffix}/${stageName}`;
+    const distributionUrl = `https://${distribution.domainName}`;
 
     console.log('📦 Building frontend for CloudFront + API proxy...');
-    console.log(`🔗 Auto-generated API Endpoint: ${apiGatewayEndpoint}`);
+    console.log(`🔗 API Endpoint: ${apiGatewayEndpoint}`);
+    console.log('🔐 Cognito Domain provided via deploy environment variables');
+    console.log(`🌍 Frontend URL: ${distributionUrl}`);
+
     try {
       exec.execSync('npm run build', {
         cwd: frontendPath,
@@ -120,11 +127,14 @@ export class FrontendConstruct extends Construct {
         env: {
           ...process.env,
           VITE_POLLING_INTERVAL: process.env.VITE_POLLING_INTERVAL || '5000',
-          // Allow user to override with VITE_API_ENDPOINT env var
-          // If not provided, use empty string for CloudFront same-origin mode
-          // (CloudFront will add x-api-key to proxied requests)
           VITE_API_ENDPOINT: process.env.VITE_API_ENDPOINT || '',
           VITE_API_KEY: process.env.VITE_API_KEY || '',
+          VITE_AUTH_ENABLED: process.env.VITE_AUTH_ENABLED || 'false',
+          VITE_COGNITO_DOMAIN: process.env.VITE_COGNITO_DOMAIN || '',
+          VITE_COGNITO_CLIENT_ID: process.env.VITE_COGNITO_CLIENT_ID || '',
+          VITE_COGNITO_REDIRECT_URI: process.env.VITE_COGNITO_REDIRECT_URI || '',
+          VITE_COGNITO_LOGOUT_URI: process.env.VITE_COGNITO_LOGOUT_URI || '',
+          VITE_COGNITO_SCOPES: process.env.VITE_COGNITO_SCOPES || 'openid email profile',
         },
       });
     } catch (error) {
@@ -137,12 +147,64 @@ export class FrontendConstruct extends Construct {
     }
 
     // Deploy to S3
-    new s3deploy.BucketDeployment(this, 'DeployWebsite', {
+    const deployWebsite = new s3deploy.BucketDeployment(this, 'DeployWebsite', {
       sources: [s3deploy.Source.asset(distPath)],
       destinationBucket: bucket,
       distribution,
       distributionPaths: ['/*'],
     });
+
+    const runtimeConfigJson = cdk.Stack.of(this).toJsonString({
+      auth: {
+        enabled: true,
+        cognitoDomain: props.authOutput.domainUrl,
+        clientId: props.authOutput.userPoolClient.userPoolClientId,
+        redirectUri: `${distributionUrl}/`,
+        logoutUri: `${distributionUrl}/`,
+        scopes: 'openid email profile',
+      },
+    });
+
+    const runtimeConfigBody = cdk.Fn.join('', [
+      'window.__APP_CONFIG__ = ',
+      runtimeConfigJson,
+      ';',
+    ]);
+
+    const runtimeConfigWriter = new cr.AwsCustomResource(this, 'RuntimeConfigWriter', {
+      onCreate: {
+        service: 'S3',
+        action: 'putObject',
+        parameters: {
+          Bucket: bucket.bucketName,
+          Key: 'runtime-config.js',
+          Body: runtimeConfigBody,
+          ContentType: 'application/javascript',
+          CacheControl: 'no-store, max-age=0',
+        },
+        physicalResourceId: cr.PhysicalResourceId.of('RuntimeConfigWriter-v1'),
+      },
+      onUpdate: {
+        service: 'S3',
+        action: 'putObject',
+        parameters: {
+          Bucket: bucket.bucketName,
+          Key: 'runtime-config.js',
+          Body: runtimeConfigBody,
+          ContentType: 'application/javascript',
+          CacheControl: 'no-store, max-age=0',
+        },
+        physicalResourceId: cr.PhysicalResourceId.of('RuntimeConfigWriter-v1'),
+      },
+      policy: cr.AwsCustomResourcePolicy.fromStatements([
+        new iam.PolicyStatement({
+          actions: ['s3:PutObject'],
+          resources: [bucket.arnForObjects('runtime-config.js')],
+        }),
+      ]),
+    });
+
+    runtimeConfigWriter.node.addDependency(deployWebsite);
 
     // ============================================================
     // 4. Set Output
@@ -153,7 +215,6 @@ export class FrontendConstruct extends Construct {
       distributionId: distribution.distributionId,
     };
 
-    // CloudFormation Outputs
     new cdk.CfnOutput(this, 'BucketName', {
       value: bucket.bucketName,
       description: 'S3 Bucket for frontend',
@@ -161,7 +222,7 @@ export class FrontendConstruct extends Construct {
     });
 
     new cdk.CfnOutput(this, 'DistributionUrl', {
-      value: `https://${distribution.domainName}`,
+      value: distributionUrl,
       description: 'CloudFront Distribution URL',
       exportName: 'restaurant-frontend-url',
     });
