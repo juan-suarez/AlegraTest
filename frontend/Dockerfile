@@ -3,6 +3,9 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+ARG VITE_GROQ_API_KEY
+ENV VITE_GROQ_API_KEY=${VITE_GROQ_API_KEY}
+
 # Copy package files
 COPY package.json package-lock.json ./
 

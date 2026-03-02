@@ -12,6 +12,7 @@ import { MarketPurchases } from './components/marketPurchases/MarketPurchases';
 import { globalConfig } from './config/globalConfig';
 import { authService } from './auth/authService';
 import { LoginScreen } from './components/auth/LoginScreen';
+import { Chatbot } from './components/chatbot/Chatbot';
 
 type DashboardTab =
   | 'ordersInProgress'
@@ -276,6 +277,9 @@ function App() {
           </footer>
         </div>
       </main>
+
+      {/* Chatbot con IA */}
+      <Chatbot />
     </div>
   );
 }
