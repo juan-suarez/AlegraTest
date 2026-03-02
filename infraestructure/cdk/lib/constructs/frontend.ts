@@ -182,7 +182,7 @@ export class FrontendConstruct extends Construct {
           ContentType: 'application/javascript',
           CacheControl: 'no-store, max-age=0',
         },
-        physicalResourceId: cr.PhysicalResourceId.of('RuntimeConfigWriter-v1'),
+        physicalResourceId: cr.PhysicalResourceId.of('RuntimeConfigWriter-v2'),
       },
       onUpdate: {
         service: 'S3',
@@ -194,7 +194,7 @@ export class FrontendConstruct extends Construct {
           ContentType: 'application/javascript',
           CacheControl: 'no-store, max-age=0',
         },
-        physicalResourceId: cr.PhysicalResourceId.of('RuntimeConfigWriter-v1'),
+        physicalResourceId: cr.PhysicalResourceId.of('RuntimeConfigWriter-v2'),
       },
       policy: cr.AwsCustomResourcePolicy.fromStatements([
         new iam.PolicyStatement({

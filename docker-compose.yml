@@ -220,6 +220,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_GROQ_API_KEY: ${VITE_GROQ_API_KEY}
     container_name: restaurant-frontend
     depends_on:
       order-service:
@@ -228,6 +230,8 @@ services:
         condition: service_healthy
       purchasing-service:
         condition: service_healthy
+    env_file:
+      - .env
     environment:
       VITE_DOCKER: "true"
       VITE_API_ENDPOINT: https://zk8g7otl92.execute-api.us-east-1.amazonaws.com/prod
@@ -239,7 +243,7 @@ services:
     networks:
       - restaurant-network
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:3000/"]
       interval: 10s
       timeout: 5s
       retries: 3

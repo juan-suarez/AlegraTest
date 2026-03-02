@@ -371,3 +371,90 @@ La actualización ocurre cuando Order procesa:
 - Consistencia eventual  
 - Infraestructura en AWS con Lambda + SNS + SQS + PostgreSQL  
 - Microservicios desplegados como contenedores Docker  
+
+---
+
+# 🤖 Bonus Challenge: AI Chatbot
+
+## ⭐ Asistente Virtual Inteligente
+
+Este proyecto incluye un **chatbot con IA** integrado en el frontend que permite gestionar órdenes mediante lenguaje natural.
+
+### 🎯 Características
+
+- 🗣️ **Conversación Natural**: "Quiero 10 platos", "Dame 5 órdenes"
+- 📊 **Consultas Inteligentes**: "¿Cuántas órdenes hay?", "Ver inventario"
+- ⚡ **Respuestas Instantáneas**: Powered by Groq API (LLM ultra-rápido)
+- 🎨 **UI Moderna**: Floating chat button con animaciones
+- 🧠 **Parse de Intenciones**: Usa Llama 3.3 70B para entender comandos
+
+### 🚀 Stack Técnico
+
+```
+Frontend → Groq API (Llama 3.3 70B) → Parse Intent → Execute Action
+```
+
+- **LLM**: Groq con Llama 3.3 70B Versatile
+- **SDK**: groq-sdk (NPM)
+- **Free Tier**: 14,400 requests/día (sin tarjeta)
+- **Velocidad**: ~10x más rápido que OpenAI
+
+### 📋 Configuración Rápida
+
+1. Obtener API key gratis de [Groq Console](https://console.groq.com)
+2. Agregar a `.env`:
+   ```bash
+   VITE_GROQ_API_KEY=gsk_your_api_key_here
+   ```
+3. `npm install` en `/frontend`
+4. `npm run dev`
+
+### 💬 Ejemplos de Uso
+
+```
+👤 Usuario: "Quiero pedir 10 platos"
+🤖 Bot: ✅ ¡Perfecto! He creado tu orden de 10 platos.
+        ID: abc-123, Estado: Pendiente
+
+👤 Usuario: "¿Cuántas órdenes hay?"
+🤖 Bot: 📊 En progreso: 3, Completadas: 15, Total: 18
+
+👤 Usuario: "Ver inventario"
+🤖 Bot: 📦 Total: 25 ingredientes, Stock suficiente ✅
+```
+
+### 📚 Documentación Completa
+
+Ver [frontend/src/components/chatbot/README.md](frontend/src/components/chatbot/README.md) para:
+- Guía detallada de configuración
+- Arquitectura técnica
+- Personalización
+- Troubleshooting
+
+### 🎯 Decisiones de Diseño
+
+**¿Por qué frontend directo y no microservicio?**
+
+1. ✅ **Pragmático**: Es un bonus, no el core del proyecto
+2. ✅ **Rápido**: Implementación en 1 hora vs 3-4 horas
+3. ✅ **Free Tier Friendly**: Sin infraestructura adicional
+4. ✅ **Seguro**: Groq es gratis, rate limit por IP
+5. ✅ **Ya demostramos**: Arquitectura de microservicios completa
+
+**Alternativa para producción**: Backend proxy con API key en Lambda/Secrets Manager
+
+---
+
+# 🎓 Conclusión del Proyecto
+
+Este sistema demuestra:
+
+✅ **Arquitectura Event-Driven**: Comunicación 100% asíncrona  
+✅ **Microservicios**: 4 servicios independientes y escalables  
+✅ **AWS Cloud Native**: Lambda, SNS, SQS, RDS, API Gateway, Cognito  
+✅ **IaC**: Infraestructura como código con AWS CDK  
+✅ **Testing**: TDD con Jest + Testcontainers  
+✅ **CI/CD Ready**: Docker, automatización de despliegues  
+✅ **IA Integration**: Chatbot inteligente con Groq/Llama 3.3  
+
+**Bonus Challenge**: Chatbot con IA que potencia la experiencia del usuario 🤖💛
