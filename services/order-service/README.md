@@ -16,60 +16,26 @@ Su única responsabilidad es el ciclo de vida de la orden.
 
 ---
 
-# 🚀 Inicio Rápido
-
-## Prerrequisitos
-
-- Node.js 18+
-- Docker y Docker Compose
-- PostgreSQL (levantado con Docker Compose en el directorio raíz)
-
-## Instalación
+# 🚀 Cómo ejecutar
 
 ```bash
 # Instalar dependencias
 npm install
 
-# Configurar variables de entorno
-cp .env.example .env
-# Editar .env con la configuración de BD
-```
-
-## Levantar Base de Datos
-
-```bash
-# Desde el directorio raíz del proyecto
+# Desde raíz: levantar Docker Compose (BD + LocalStack)
 docker-compose up -d
 
-# Crear la base de datos del servicio (opcional, si no usas init scripts)
-./create-db.sh order_service
-```
+# Ejecutar el servicio
+npm start
 
-## Desarrollo
-
-```bash
-# Ejecutar en modo desarrollo
+# Desarrollo (con reload automático)
 npm run dev
 
-# Ejecutar tests
+# Tests
 npm test
-
-# Ejecutar tests en modo watch
-npm run test:watch
-
-# Ejecutar tests con cobertura
-npm run test:coverage
 ```
 
-## Compilación y Producción
-
-```bash
-# Compilar TypeScript
-npm run build
-
-# Ejecutar versión compilada
-npm start
-```
+**Puerto:** 3001
 
 ---
 

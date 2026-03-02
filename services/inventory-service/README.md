@@ -6,6 +6,29 @@ Es la única fuente de verdad del stock.
 
 ---
 
+# 🚀 Cómo ejecutar
+
+```bash
+# Instalar dependencias
+npm install
+
+# Desde raíz: levantar Docker Compose (BD + LocalStack)
+docker-compose up -d
+
+# Ejecutar el servicio
+npm start
+
+# Desarrollo (con reload automático)
+npm run dev
+
+# Tests
+npm test
+```
+
+**Puerto:** 3002
+
+---
+
 # 1. Responsabilidades
 
 - Mantener stock consistente de ingredientes.
@@ -113,17 +136,56 @@ inventory publica:
 PurchaseRequested
 ```
 
-Evento por ingrediente:
+Eventos por ingrediente en **batches de 5 unidades**:
 
 ```json
 {
   "orderId": "123",
   "ingredientId": "tomato",
-  "quantityRequired": 4
+  "quantityRequired": 5
 }
 ```
 
-Esto debido a que no se pueden comprar varios ingredientes al mismo tiempo ni tampoco especificar la cantidad de ingredientes solicitada lo que implica un proceso de reintento de compras por parte de `purcharse-service` hasta garantizar la cantidad necesaria para completar la orden.
+### Estrategia de Batches (5 unidades)
+
+Si se necesitan más de 5 unidades de un ingrediente, se envían múltiples eventos:
+
+```
+Necesita: 17 tomates
+  ↓
+Batch 1: 5 tomates
+Batch 2: 5 tomates  
+Batch 3: 5 tomates
+Batch 4: 2 tomates (última)
+```
+
+**Por qué batches:**
+- Garantiza que cada intento de compra sea gestionable
+- Si `purchasing-service` falla en un batch, otros pueden completarse
+- Permite reintentos independientes por batch
+- Evita perder toda la compra si falla un ingrediente
+- Aumenta probabilidad de completar la orden parcialmente
+
+**Ejemplo en código:**
+```typescript
+const quantityNeeded = 17;
+const BATCH_SIZE = 5;
+const batches = [];
+
+for (let i = 0; i < quantityNeeded; i += BATCH_SIZE) {
+  const batchQuantity = Math.min(BATCH_SIZE, quantityNeeded - i);
+  batches.push({
+    orderId: "123",
+    ingredientId: "tomato",
+    quantityRequired: batchQuantity  // 5, 5, 5, 2
+  });
+}
+
+// Publicar cada batch como evento independiente
+await Promise.all(batches.map(batch => eventBus.publish(batch)));
+```
+
+Esto debido a que no se pueden comprar varios ingredientes al mismo tiempo ni tampoco especificar la cantidad exacta, lo que implica un proceso de reintento de compras por parte de `purchasing-service` hasta garantizar la cantidad necesaria para completar la orden.
 
 ---
 

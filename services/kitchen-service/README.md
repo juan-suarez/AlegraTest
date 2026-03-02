@@ -16,6 +16,29 @@ Las recetas están definidas en código.
 
 ---
 
+# 🚀 Cómo ejecutar
+
+```bash
+# Instalar dependencias
+npm install
+
+# Desde raíz: levantar Docker Compose (BD + LocalStack)
+docker-compose up -d
+
+# Ejecutar el servicio
+npm start
+
+# Desarrollo (con reload automático)
+npm run dev
+
+# Tests
+npm test
+```
+
+**Nota:** Este servicio es event-driven. Se ejecuta en background escuchando eventos SNS/SQS.
+
+---
+
 # 1. Responsabilidades
 
 ✔ Seleccionar recetas aleatorias  

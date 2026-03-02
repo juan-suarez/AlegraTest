@@ -7,6 +7,29 @@ Su responsabilidad es intentar comprar la cantidad requerida y emitir un único 
 
 ---
 
+# 🚀 Cómo ejecutar
+
+```bash
+# Instalar dependencias
+npm install
+
+# Desde raíz: levantar Docker Compose (BD + LocalStack)
+docker-compose up -d
+
+# Ejecutar el servicio
+npm start
+
+# Desarrollo (con reload automático)
+npm run dev
+
+# Tests
+npm test
+```
+
+**Puerto:** 3003
+
+---
+
 # 1. Responsabilidades
 
 - Recibir solicitudes de compra por ingrediente.
@@ -76,7 +99,7 @@ mientras acumulado < quantityRequired y reintentos < MAX_RETRIES:
 
 Configuración sugerida:
 
-- `MAX_RETRIES = 3`
+- `MAX_RETRIES = 8`
 - Backoff exponencial entre intentos
 
 ---
